@@ -78,6 +78,8 @@
   .iconBtn:active{ transform:scale(0.94); }
   #coinBadge{ display:flex; align-items:center; gap:6px; padding:8px 14px; font-family:'Bungee',cursive; font-size:14px; color:var(--accent-gold); }
   #coinBadge .coinIcon{ width:14px; height:14px; border-radius:50%; background:radial-gradient(circle at 35% 30%, #fff3c2, var(--accent-gold)); box-shadow:0 0 8px rgba(255,203,71,0.6); }
+  #gemBadge{ display:flex; align-items:center; gap:6px; padding:8px 14px; font-family:'Bungee',cursive; font-size:14px; color:#7ce8ff; }
+  #gemBadge .gemIcon{ font-size:13px; filter:drop-shadow(0 0 6px rgba(124,232,255,0.7)); }
 
   #powerupBar{ position:absolute; top:96px; left:18px; display:flex; flex-direction:column; gap:6px; z-index:5; pointer-events:none; }
   .powerChip{
@@ -605,6 +607,7 @@
         <button class="iconBtn" id="storeBtnHud" title="Premium Store">💎</button>
       </div>
       <div class="panel" id="coinBadge"><span class="coinIcon"></span><span id="coinVal">0</span></div>
+      <div class="panel" id="gemBadge"><span class="gemIcon">💎</span><span id="gemVal">0</span></div>
       <div class="panel" id="arcadeTimerBadge">⏱ <span id="arcadeTimerVal">60</span>s</div>
       <div class="panel" id="livesRow" style="display:flex; align-items:center; gap:8px;"></div>
     </div>
@@ -692,11 +695,23 @@
             <div class="ds">One life. One mistake ends it. +50% coins as the reward for the risk.</div>
             <div class="bestTag" id="modeBestHardcore"></div>
           </div>
-          <div class="modeCard locked" title="Coming soon">
-            <span class="lockTag">Soon</span>
+          <div class="modeCard" id="modeCardBossrush" data-mode="bossrush" style="--mode-glow: rgba(255,150,20,0.55);">
             <div class="icon">🐉</div>
             <div class="nm">BOSS RUSH</div>
-            <div class="ds">Giant fruit bosses with health bars and attack patterns.</div>
+            <div class="ds">Giant fruit bosses with health bars, back-to-back. Earn bonus gems per kill.</div>
+            <div class="bestTag" id="modeBestBossrush"></div>
+          </div>
+          <div class="modeCard" id="modeCardBlitz" data-mode="blitz" style="--mode-glow: rgba(255,220,60,0.55);">
+            <div class="icon">⚡</div>
+            <div class="nm">BLITZ</div>
+            <div class="ds">30 seconds. Nonstop fruit storm — the fastest, densest spawns in the dojo.</div>
+            <div class="bestTag" id="modeBestBlitz"></div>
+          </div>
+          <div class="modeCard" id="modeCardChaos" data-mode="chaos" style="--mode-glow: rgba(200,60,255,0.55);">
+            <div class="icon">🌀</div>
+            <div class="nm">CHAOS</div>
+            <div class="ds">2 lives, way more bombs and powerups flying. +75% coins for surviving the storm.</div>
+            <div class="bestTag" id="modeBestChaos"></div>
           </div>
         </div>
       </div>
@@ -756,6 +771,7 @@
     <p class="sub" style="margin-bottom:6px;">Best this session: <b id="bestScore">0</b></p>
     <div class="statGrid">
       <div class="statCard"><div class="v" id="goCoins">0</div><div class="l">Coins Earned</div></div>
+      <div class="statCard"><div class="v" id="goGems">0</div><div class="l">Gems Earned</div></div>
       <div class="statCard"><div class="v" id="goCombo">0</div><div class="l">Best Combo</div></div>
       <div class="statCard"><div class="v" id="goXp">0</div><div class="l">XP Gained</div></div>
     </div>
@@ -784,8 +800,12 @@
       <button class="closeX" id="closeShop">✕</button>
       <div class="menuHead">
         <h1 class="title" style="font-size:26px; margin:0;">THE <span>ARMORY</span></h1>
-        <div class="panel" id="coinBadgeShop" style="display:flex; align-items:center; gap:6px; padding:8px 14px; font-family:'Bungee',cursive; font-size:14px; color:var(--accent-gold);"><span class="coinIcon"></span><span id="coinValShop">0</span></div>
+        <div style="display:flex; gap:8px;">
+          <div class="panel" id="coinBadgeShop" style="display:flex; align-items:center; gap:6px; padding:8px 14px; font-family:'Bungee',cursive; font-size:14px; color:var(--accent-gold);"><span class="coinIcon"></span><span id="coinValShop">0</span></div>
+          <div class="panel" id="gemBadgeShop" style="display:flex; align-items:center; gap:6px; padding:8px 14px; font-family:'Bungee',cursive; font-size:14px; color:#7ce8ff;">💎<span id="gemValShop">0</span></div>
+        </div>
       </div>
+      <p class="sub" style="font-size:11px; margin:0 0 10px; text-align:left;">Gems are earned by defeating boss fruit and can unlock rare cosmetics coins can't buy.</p>
       <div class="menuTabs">
         <button class="tabBtn active" data-shoptab="knives">Knives</button>
         <button class="tabBtn" data-shoptab="trails">Trails</button>
@@ -966,12 +986,12 @@
   const Save = (function(){
     const KEY = 'dojoSlash_save_v2';
     const defaults = {
-      coins:0, totalXp:0, bestScore:0, bestArcadeScore:0, bestZenScore:0, bestSurvivalScore:0, bestHardcoreScore:0, playerId:'', lastMysteryClaim:'', playerName:'',
+      coins:0, gems:0, totalXp:0, bestScore:0, bestArcadeScore:0, bestZenScore:0, bestSurvivalScore:0, bestHardcoreScore:0, bestBossrushScore:0, bestBlitzScore:0, bestChaosScore:0, playerId:'', lastMysteryClaim:'', playerName:'',
       referralCode:'', referredBy:'', referralUsed:false, referralInvites:0, referralCoinsEarned:0, referralHistory:[],
       equippedKnife:'k_basic', equippedTrail:'t_lime', equippedBg:'bg_dojo',
       unlockedKnives:['k_basic'], unlockedTrails:['t_lime'], unlockedBg:['bg_dojo'],
       settings:{ sensitivity:1, music:0.5, sfx:0.8, shake:true, blur:true },
-      stats:{ gamesPlayed:0, totalSliced:0, totalBombsHit:0, bestCombo:0, totalCoinsEarned:0, totalPowerups:0 },
+      stats:{ gamesPlayed:0, totalSliced:0, totalBombsHit:0, bestCombo:0, totalCoinsEarned:0, totalGemsEarned:0, totalPowerups:0, bossesDefeated:0 },
       achievements:{}, // id -> true
       missions:{ date:'', list:[] },
       leaderboard:[] // {score,date}
@@ -1000,10 +1020,11 @@
      without touching any gameplay logic.
   ========================================================================= */
   const Perf = (function(){
-    const SAMPLE = 40;
+    const SAMPLE = 30;
     const frameTimes = [];
     let level = 0;          // 0 high, 1 medium, 2 low
     let lastBump = 0;
+    let stutterStreak = 0;  // consecutive hard-drop frames, for a fast-track downgrade
     // Cheap upfront device heuristic so we don't start maxed-out on weak hardware.
     const cores = navigator.hardwareConcurrency || 4;
     const isCoarsePointer = window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
@@ -1012,12 +1033,20 @@
       const fps = dt>0 ? 1/dt : 60;
       frameTimes.push(fps);
       if(frameTimes.length > SAMPLE) frameTimes.shift();
-      if(frameTimes.length < SAMPLE) return;
       const now = performance.now();
-      if(now - lastBump < 2000) return; // re-evaluate at most every 2s to avoid flapping
+      // Fast-track: a real stutter streak (well below 30fps for ~8 frames in a
+      // row) shouldn't have to wait for a full rolling window to average out —
+      // drop quality immediately so the game recovers smoothly instead of
+      // chugging while it "waits and sees".
+      if(fps < 28){ stutterStreak++; } else { stutterStreak = 0; }
+      if(stutterStreak >= 8 && level < 2 && now - lastBump > 400){
+        level++; lastBump = now; stutterStreak = 0; applyLevel(); return;
+      }
+      if(frameTimes.length < SAMPLE) return;
+      if(now - lastBump < 1200) return; // re-evaluate at most every 1.2s to avoid flapping
       const avg = frameTimes.reduce((a,b)=>a+b,0) / frameTimes.length;
-      if(avg < 42 && level < 2){ level++; lastBump = now; applyLevel(); }
-      else if(avg > 56 && level > 0){ level--; lastBump = now; applyLevel(); }
+      if(avg < 45 && level < 2){ level++; lastBump = now; applyLevel(); }
+      else if(avg > 57 && level > 0){ level--; lastBump = now; applyLevel(); }
     }
     function applyLevel(){
       const dpr = window.devicePixelRatio || 1;
@@ -1203,42 +1232,78 @@
     { id:'t_dragonflame', name:'Dragon Flame Trail', rarity:'ultimate', price:122000, color:'#ff6a00' },
   ];
   const BACKGROUNDS = [
-    // common
-    { id:'bg_dojo', name:'Night Dojo', rarity:'common', price:0, grad:'radial-gradient(60% 40% at 50% 100%, rgba(198,255,61,0.06), transparent 70%), radial-gradient(35% 25% at 15% 10%, rgba(255,140,59,0.08), transparent 70%), radial-gradient(35% 25% at 85% 10%, rgba(76,76,255,0.08), transparent 70%)', ambient:['dust','firefly'], temple:true },
-    { id:'bg_woodendojo', name:'Traditional Wooden Dojo', rarity:'common', price:25, grad:'radial-gradient(60% 40% at 50% 100%, rgba(200,150,90,0.1), transparent 70%), radial-gradient(35% 25% at 20% 10%, rgba(255,180,100,0.08), transparent 70%)', ambient:['dust','rays','shadows'], temple:true },
-    { id:'bg_woodenkitchen', name:'Wooden Kitchen', rarity:'common', price:50, grad:'radial-gradient(60% 40% at 50% 100%, rgba(210,160,100,0.12), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(255,220,150,0.08), transparent 70%)', ambient:['dust','candle'] },
-    { id:'bg_garden', name:'Zen Garden', rarity:'common', price:80, grad:'radial-gradient(60% 40% at 50% 100%, rgba(120,200,120,0.12), transparent 70%), radial-gradient(35% 25% at 20% 10%, rgba(160,220,255,0.08), transparent 70%)', ambient:['dust','fog','firefly'] },
-    { id:'bg_samuraihall', name:'Samurai Training Hall', rarity:'common', price:95, grad:'radial-gradient(60% 40% at 50% 100%, rgba(190,140,80,0.12), transparent 70%), radial-gradient(35% 25% at 20% 10%, rgba(255,200,120,0.1), transparent 70%)', ambient:['dust','rays','shadows'], temple:true },
-    { id:'bg_teahouse', name:'Japanese Tea House', rarity:'common', price:110, grad:'radial-gradient(60% 40% at 50% 100%, rgba(200,170,120,0.12), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(255,230,180,0.1), transparent 70%)', ambient:['dust','fog','candle'] },
-    // rare
-    { id:'bg_bamboo', name:'Bamboo Forest', rarity:'rare', price:210, grad:'radial-gradient(60% 40% at 50% 100%, rgba(120,220,140,0.14), transparent 70%), radial-gradient(35% 25% at 15% 10%, rgba(200,255,180,0.1), transparent 70%)', ambient:['leaves','wind','firefly'] },
-    { id:'bg_sakura', name:'Sakura Grove', rarity:'rare', price:260, grad:'radial-gradient(60% 50% at 50% 100%, rgba(255,120,170,0.12), transparent 70%), radial-gradient(40% 30% at 20% 0%, rgba(255,200,220,0.1), transparent 70%)', ambient:['leaves','wind'] },
-    { id:'bg_sushi', name:'Sushi Restaurant', rarity:'rare', price:330, grad:'radial-gradient(60% 40% at 50% 100%, rgba(255,80,80,0.12), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(255,255,255,0.08), transparent 70%)', ambient:['dust'] },
-    { id:'bg_nightcity', name:'Lantern Street', rarity:'rare', price:470, grad:'radial-gradient(60% 40% at 50% 100%, rgba(255,150,60,0.16), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(255,100,60,0.12), transparent 70%)', ambient:['lantern','dust'] },
-    { id:'bg_village', name:'Wooden Village', rarity:'rare', price:400, grad:'radial-gradient(60% 40% at 50% 100%, rgba(200,150,90,0.14), transparent 70%), radial-gradient(35% 25% at 20% 10%, rgba(255,190,120,0.1), transparent 70%)', ambient:['dust','rays','shadows'] },
-    { id:'bg_mountaindojo', name:'Mountain Dojo', rarity:'rare', price:540, grad:'radial-gradient(60% 40% at 50% 100%, rgba(160,190,220,0.14), transparent 70%), radial-gradient(35% 25% at 20% 10%, rgba(220,240,255,0.12), transparent 70%)', ambient:['fog','wind'], temple:true },
-    // epic
-    { id:'bg_volcano', name:'Volcano Ridge', rarity:'epic', price:1000, grad:'radial-gradient(60% 40% at 50% 100%, rgba(255,80,20,0.16), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(255,150,0,0.12), transparent 70%)', ambient:['dust'] },
-    { id:'bg_luxkitchen', name:'Luxury Restaurant Kitchen', rarity:'epic', price:1150, grad:'radial-gradient(60% 40% at 50% 100%, rgba(255,220,150,0.16), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(255,255,255,0.1), transparent 70%)', ambient:['candle'] },
-    { id:'bg_cherrytemple', name:'Cherry Blossom Temple', rarity:'epic', price:1300, grad:'radial-gradient(60% 50% at 50% 100%, rgba(255,140,190,0.18), transparent 70%), radial-gradient(40% 30% at 20% 0%, rgba(255,210,230,0.12), transparent 70%)', ambient:['leaves','wind'] },
-    { id:'bg_icecave', name:'Ice Cave', rarity:'epic', price:1450, grad:'radial-gradient(60% 40% at 50% 100%, rgba(140,220,255,0.18), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(220,255,255,0.12), transparent 70%)', ambient:['dust'] },
-    { id:'bg_ancienttemple', name:'Ancient Temple', rarity:'epic', price:1600, grad:'radial-gradient(60% 40% at 50% 100%, rgba(180,150,90,0.16), transparent 70%), radial-gradient(35% 25% at 20% 10%, rgba(120,200,140,0.1), transparent 70%)', ambient:['dust','fog','shadows'], temple:true },
-    { id:'bg_courtyard', name:'Temple Courtyard', rarity:'epic', price:1750, grad:'radial-gradient(60% 40% at 50% 100%, rgba(200,160,100,0.16), transparent 70%), radial-gradient(35% 25% at 20% 10%, rgba(255,210,150,0.12), transparent 70%)', ambient:['dust','rays','lantern'], temple:true },
-    { id:'bg_raincabin', name:'Rainy Wooden Cabin', rarity:'epic', price:1900, grad:'radial-gradient(60% 40% at 50% 100%, rgba(120,140,160,0.16), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(180,200,220,0.12), transparent 70%)', ambient:['rain','fog','candle'] },
-    // legendary
-    { id:'bg_cosmic', name:'Cosmic Void', rarity:'legendary', price:4900, grad:'radial-gradient(70% 50% at 50% 0%, rgba(120,60,255,0.18), transparent 70%), radial-gradient(50% 40% at 20% 90%, rgba(0,220,255,0.1), transparent 70%)', ambient:['dust'] },
-    { id:'bg_hauntedcastle', name:'Haunted Castle', rarity:'legendary', price:6300, grad:'radial-gradient(70% 50% at 50% 0%, rgba(120,255,140,0.14), transparent 70%), radial-gradient(50% 40% at 20% 90%, rgba(60,20,80,0.2), transparent 70%)', ambient:['fog'] },
-    { id:'bg_pirateship', name:'Pirate Ship', rarity:'legendary', price:7700, grad:'radial-gradient(70% 50% at 50% 0%, rgba(120,180,255,0.16), transparent 70%), radial-gradient(50% 40% at 20% 90%, rgba(200,170,100,0.12), transparent 70%)', ambient:['dust','wind'] },
-    { id:'bg_skytemple', name:'Sunset Temple', rarity:'legendary', price:9100, grad:'radial-gradient(70% 50% at 50% 0%, rgba(255,150,90,0.24), transparent 70%), radial-gradient(50% 40% at 20% 90%, rgba(255,90,110,0.16), transparent 70%)', ambient:['rays','dust','shadows'], temple:true },
-    { id:'bg_cyberpunk', name:'Cyberpunk', rarity:'legendary', price:10800, grad:'radial-gradient(70% 50% at 50% 0%, rgba(255,40,180,0.2), transparent 70%), radial-gradient(50% 40% at 20% 90%, rgba(40,220,255,0.16), transparent 70%)', ambient:['dust'] },
-    // mythic
-    { id:'bg_aurora', name:'Aurora Peak', rarity:'mythic', price:24500, grad:'radial-gradient(70% 60% at 50% 0%, rgba(60,255,190,0.2), transparent 70%), radial-gradient(50% 40% at 80% 100%, rgba(255,60,220,0.14), transparent 70%)', ambient:['dust'] },
-    { id:'bg_floatingislands', name:'Floating Islands', rarity:'mythic', price:31500, grad:'radial-gradient(70% 60% at 50% 0%, rgba(140,220,255,0.22), transparent 70%), radial-gradient(50% 40% at 80% 100%, rgba(140,255,180,0.14), transparent 70%)', ambient:['dust','wind'] },
-    { id:'bg_spacestation', name:'Space Station', rarity:'mythic', price:38500, grad:'radial-gradient(70% 60% at 50% 0%, rgba(200,200,255,0.2), transparent 70%), radial-gradient(50% 40% at 80% 100%, rgba(80,120,255,0.16), transparent 70%)', ambient:['dust'] },
-    { id:'bg_moon', name:'Moon', rarity:'mythic', price:45500, grad:'radial-gradient(70% 60% at 50% 0%, rgba(220,220,230,0.2), transparent 70%), radial-gradient(50% 40% at 80% 100%, rgba(120,120,160,0.14), transparent 70%)', ambient:['dust'] },
-    { id:'bg_galaxy', name:'Galaxy', rarity:'mythic', price:50800, grad:'radial-gradient(70% 60% at 50% 0%, rgba(120,60,255,0.24), transparent 70%), radial-gradient(50% 40% at 80% 100%, rgba(255,60,220,0.18), transparent 70%)', ambient:['dust'] },
-    // ultimate
-    { id:'bg_luxmansion', name:'Luxury Mansion', rarity:'ultimate', price:133000, grad:'radial-gradient(70% 60% at 50% 0%, rgba(255,220,150,0.26), transparent 70%), radial-gradient(50% 40% at 80% 100%, rgba(255,255,255,0.18), transparent 70%)', ambient:['candle','rays'] },
+    { id:'bg_dojo', name:'Ancient Japanese Temple', rarity:'common', price:0,
+      grad:'radial-gradient(70% 55% at 50% 15%, rgba(120,110,180,0.16), transparent 70%), radial-gradient(60% 45% at 50% 100%, rgba(255,140,90,0.10), transparent 70%), radial-gradient(35% 25% at 15% 10%, rgba(255,140,59,0.08), transparent 70%), radial-gradient(35% 25% at 85% 10%, rgba(80,90,160,0.10), transparent 70%)',
+      sceneWash:[[0,'rgba(28,20,42,0.9)'],[0.45,'rgba(58,30,46,0.55)'],[1,'rgba(10,8,14,0.85)']],
+      ambient:['sakura','lantern','fog','firefly'], temple:true, torii:true, moon:true },
+    { id:'bg_coralreef', name:'Underwater Kingdom', rarity:'rare', price:380,
+      grad:'radial-gradient(60% 45% at 50% 100%, rgba(60,220,220,0.2), transparent 70%), radial-gradient(35% 25% at 20% 10%, rgba(255,140,170,0.12), transparent 70%), radial-gradient(30% 20% at 80% 15%, rgba(120,255,200,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(6,32,48,0.9)'],[0.5,'rgba(8,48,60,0.7)'],[1,'rgba(2,20,26,0.9)']],
+      ambient:['bubble','dust'], underwater:true },
+    { id:'bg_hauntedforest', name:'Haunted Forest', rarity:'rare', price:560,
+      grad:'radial-gradient(60% 40% at 50% 100%, rgba(40,120,90,0.16), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(180,220,200,0.12), transparent 70%), radial-gradient(30% 20% at 20% 15%, rgba(20,60,50,0.14), transparent 70%)',
+      sceneWash:[[0,'rgba(4,14,12,0.92)'],[0.5,'rgba(6,26,20,0.7)'],[1,'rgba(2,8,7,0.92)']],
+      ambient:['fog','firefly','wind'], moon:true, hauntedforest:true },
+    { id:'bg_samuraihall', name:'Samurai Battlefield', rarity:'epic', price:1150,
+      grad:'radial-gradient(60% 40% at 50% 100%, rgba(210,120,60,0.16), transparent 70%), radial-gradient(35% 25% at 20% 10%, rgba(255,160,90,0.13), transparent 70%), radial-gradient(30% 20% at 80% 15%, rgba(120,40,40,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(30,14,10,0.9)'],[0.5,'rgba(60,26,14,0.55)'],[1,'rgba(10,6,6,0.9)']],
+      ambient:['ember','shadows','dust'], torii:true, battlefield:true },
+    { id:'bg_volcano', name:'Volcano Realm', rarity:'epic', price:1400,
+      grad:'radial-gradient(60% 40% at 50% 100%, rgba(255,80,20,0.24), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(255,150,0,0.16), transparent 70%), radial-gradient(30% 20% at 20% 15%, rgba(255,40,40,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(8,4,6,0.92)'],[0.55,'rgba(40,10,8,0.6)'],[1,'rgba(4,2,3,0.92)']],
+      ambient:['ember','dust'], volcano:true },
+    { id:'bg_icecave', name:'Frozen Palace', rarity:'epic', price:1700,
+      grad:'radial-gradient(60% 40% at 50% 100%, rgba(140,220,255,0.24), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(220,255,255,0.16), transparent 70%), radial-gradient(30% 20% at 20% 15%, rgba(160,180,255,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(8,16,32,0.92)'],[0.5,'rgba(16,36,56,0.6)'],[1,'rgba(4,10,20,0.92)']],
+      ambient:['snow','dust'], ice:true },
+    { id:'bg_cyberpunk', name:'Cyber Tokyo', rarity:'legendary', price:6800,
+      grad:'radial-gradient(70% 50% at 50% 0%, rgba(255,40,180,0.24), transparent 70%), radial-gradient(50% 40% at 20% 90%, rgba(40,220,255,0.20), transparent 70%), radial-gradient(30% 30% at 85% 20%, rgba(255,240,60,0.09), transparent 70%)',
+      sceneWash:[[0,'rgba(8,4,24,0.92)'],[0.5,'rgba(20,8,40,0.6)'],[1,'rgba(4,2,10,0.92)']],
+      ambient:['neonrain','spark','hologram','fog'], cyber:true },
+    { id:'bg_spaceodyssey', name:'Space Odyssey', rarity:'legendary', price:9200,
+      grad:'radial-gradient(70% 50% at 50% 0%, rgba(120,80,200,0.22), transparent 70%), radial-gradient(50% 40% at 80% 20%, rgba(255,150,90,0.16), transparent 70%), radial-gradient(30% 30% at 15% 80%, rgba(60,90,200,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(4,4,14,0.94)'],[0.5,'rgba(10,8,28,0.7)'],[1,'rgba(2,2,8,0.94)']],
+      ambient:['dust'], space:true },
+    { id:'bg_dragonrealm', name:'Dragon Realm', rarity:'mythic', price:33000,
+      grad:'radial-gradient(70% 60% at 50% 0%, rgba(150,60,220,0.26), transparent 70%), radial-gradient(50% 40% at 80% 100%, rgba(255,140,220,0.16), transparent 70%), radial-gradient(30% 30% at 15% 80%, rgba(60,30,120,0.16), transparent 70%)',
+      sceneWash:[[0,'rgba(20,6,30,0.9)'],[0.5,'rgba(40,14,50,0.55)'],[1,'rgba(8,4,14,0.9)']],
+      ambient:['fog','firefly'], temple:true, dragon:true },
+    { id:'bg_luxmansion', name:'Golden Palace', rarity:'ultimate', price:88000,
+      grad:'radial-gradient(70% 60% at 50% 0%, rgba(255,220,150,0.32), transparent 70%), radial-gradient(50% 40% at 80% 100%, rgba(255,255,255,0.2), transparent 70%), radial-gradient(30% 30% at 15% 80%, rgba(200,170,255,0.08), transparent 70%)',
+      sceneWash:[[0,'rgba(26,18,4,0.85)'],[0.5,'rgba(50,34,6,0.5)'],[1,'rgba(10,7,2,0.85)']],
+      ambient:['candle','rays'], goldenpalace:true },
+    { id:'bg_autumnshrine', name:'Autumn Shrine', rarity:'rare', price:480,
+      grad:'radial-gradient(70% 55% at 50% 15%, rgba(220,140,60,0.18), transparent 70%), radial-gradient(60% 45% at 50% 100%, rgba(255,110,60,0.12), transparent 70%), radial-gradient(35% 25% at 15% 10%, rgba(255,180,80,0.1), transparent 70%), radial-gradient(35% 25% at 85% 10%, rgba(160,90,50,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(36,20,10,0.9)'],[0.45,'rgba(64,30,14,0.55)'],[1,'rgba(12,8,6,0.85)']],
+      ambient:['leaves','wind','lantern'], temple:true, torii:true },
+    { id:'bg_moonlitbattlefield', name:'Moonlit Battlefield', rarity:'epic', price:1550,
+      grad:'radial-gradient(60% 40% at 50% 100%, rgba(120,140,220,0.18), transparent 70%), radial-gradient(35% 25% at 20% 10%, rgba(200,210,255,0.14), transparent 70%), radial-gradient(30% 20% at 80% 15%, rgba(60,60,100,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(8,8,20,0.92)'],[0.5,'rgba(18,18,38,0.6)'],[1,'rgba(4,4,10,0.92)']],
+      ambient:['shadows','ember','dust'], moon:true, battlefield:true },
+    { id:'bg_bioluminentforest', name:'Bioluminescent Grove', rarity:'epic', price:1850,
+      grad:'radial-gradient(60% 40% at 50% 100%, rgba(60,220,180,0.18), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(140,255,220,0.14), transparent 70%), radial-gradient(30% 20% at 20% 15%, rgba(120,60,220,0.12), transparent 70%)',
+      sceneWash:[[0,'rgba(2,16,14,0.92)'],[0.5,'rgba(6,30,26,0.65)'],[1,'rgba(1,6,6,0.92)']],
+      ambient:['firefly','fog','firefly'], moon:true, hauntedforest:true },
+    { id:'bg_stormocean', name:'Storm Ocean Depths', rarity:'rare', price:650,
+      grad:'radial-gradient(60% 45% at 50% 100%, rgba(30,140,180,0.22), transparent 70%), radial-gradient(35% 25% at 20% 10%, rgba(90,170,220,0.14), transparent 70%), radial-gradient(30% 20% at 80% 15%, rgba(60,200,180,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(2,20,32,0.92)'],[0.5,'rgba(4,34,44,0.72)'],[1,'rgba(1,10,16,0.92)']],
+      ambient:['bubble','dust'], underwater:true },
+    { id:'bg_infernocore', name:'Inferno Core', rarity:'legendary', price:7800,
+      grad:'radial-gradient(65% 45% at 50% 40%, rgba(255,40,10,0.28), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(255,190,0,0.18), transparent 70%), radial-gradient(30% 20% at 20% 15%, rgba(140,0,0,0.14), transparent 70%)',
+      sceneWash:[[0,'rgba(10,2,2,0.94)'],[0.5,'rgba(46,8,6,0.65)'],[1,'rgba(4,1,1,0.94)']],
+      ambient:['ember','dust','rays'], volcano:true },
+    { id:'bg_auroraglacier', name:'Aurora Glacier', rarity:'legendary', price:8200,
+      grad:'radial-gradient(60% 40% at 50% 0%, rgba(100,255,200,0.22), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(180,120,255,0.16), transparent 70%), radial-gradient(30% 20% at 20% 15%, rgba(140,200,255,0.12), transparent 70%)',
+      sceneWash:[[0,'rgba(4,14,26,0.92)'],[0.5,'rgba(10,30,44,0.6)'],[1,'rgba(2,8,16,0.92)']],
+      ambient:['snow','dust','firefly'], ice:true },
+    { id:'bg_neondistrict', name:'Neon District', rarity:'mythic', price:40000,
+      grad:'radial-gradient(70% 50% at 50% 0%, rgba(255,60,220,0.28), transparent 70%), radial-gradient(50% 40% at 20% 90%, rgba(60,240,255,0.22), transparent 70%), radial-gradient(30% 30% at 85% 20%, rgba(255,255,80,0.12), transparent 70%)',
+      sceneWash:[[0,'rgba(10,4,22,0.92)'],[0.5,'rgba(24,8,44,0.62)'],[1,'rgba(4,2,10,0.92)']],
+      ambient:['neonrain','spark','hologram'], cyber:true },
+    { id:'bg_starfall', name:'Starfall Nebula', rarity:'mythic', price:45000,
+      grad:'radial-gradient(70% 50% at 50% 0%, rgba(160,100,255,0.24), transparent 70%), radial-gradient(50% 40% at 80% 20%, rgba(255,170,110,0.18), transparent 70%), radial-gradient(30% 30% at 15% 80%, rgba(80,110,220,0.12), transparent 70%)',
+      sceneWash:[[0,'rgba(5,4,16,0.94)'],[0.5,'rgba(12,9,32,0.72)'],[1,'rgba(2,2,9,0.94)']],
+      ambient:['dust','firefly'], space:true },
   ];
   const ACHIEVEMENTS = [
     { id:'first_slice', name:'First Blood', desc:'Slice your first fruit', icon:'🍉', check:s=>s.totalSliced>=1 },
@@ -1251,6 +1316,16 @@
     { id:'survivor', name:'Survivor', desc:'Play 25 games', icon:'🎮', check:s=>s.gamesPlayed>=25 },
     { id:'powerhungry', name:'Power Hungry', desc:'Use 20 power-ups', icon:'✨', check:s=>s.totalPowerups>=20 },
     { id:'score1000', name:'Blademaster', desc:'Score 1000+ in a single run', icon:'🗡️', check:(s,ctx)=>ctx&&ctx.runScore>=1000 },
+    { id:'flawless', name:'Flawless Run', desc:'Finish a run without hitting a bomb', icon:'🛡️', check:(s,ctx)=>ctx&&ctx.noBomb },
+    { id:'goldentouch', name:'Golden Touch', desc:'Slice a golden fruit', icon:'✨', check:(s,ctx)=>ctx&&ctx.golden },
+    { id:'bossslayer', name:'Boss Slayer', desc:'Defeat your first boss fruit', icon:'⚔️', check:s=>(s.bossesDefeated||0)>=1 },
+    { id:'bossveteran', name:'Shogun Slayer', desc:'Defeat 10 boss fruits', icon:'🐉', check:s=>(s.bossesDefeated||0)>=10 },
+    { id:'combo50', name:'Combo God', desc:'Reach a 50x combo', icon:'🌀', check:s=>s.bestCombo>=50 },
+    { id:'dedicated', name:'Dedicated Ninja', desc:'Play 100 games', icon:'🥋', check:s=>s.gamesPlayed>=100 },
+    { id:'tenthousand', name:'Slice Deity', desc:'Slice 10,000 fruits lifetime', icon:'👑', check:s=>s.totalSliced>=10000 },
+    { id:'score5000', name:'Legendary Blade', desc:'Score 5000+ in a single run', icon:'🔥', check:(s,ctx)=>ctx&&ctx.runScore>=5000 },
+    { id:'gemhoarder', name:'Gem Hoarder', desc:'Earn 100 gems lifetime', icon:'💎', check:s=>(s.totalGemsEarned||0)>=100 },
+    { id:'collector', name:'Cosmetic Collector', desc:'Own 5 different backgrounds', icon:'🎨', check:()=>(Save.d.unlockedBg||[]).length>=5 },
   ];
   const MISSION_POOL = [
     { id:'slice50', name:'Slice 50 fruits', target:50, reward:400, type:'slice' },
@@ -1337,8 +1412,12 @@
      THREE.JS SETUP
   ========================================================================= */
   const canvas = document.getElementById('gameCanvas');
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+  // Cheap upfront heuristic (same signal the Perf module uses) so weak/mobile
+  // devices never even pay for antialiasing — smoother from frame one instead
+  // of waiting for the adaptive system to notice and downgrade later.
+  const __weakDeviceHint = (navigator.hardwareConcurrency||4) <= 4 && window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias:!__weakDeviceHint, alpha:true, powerPreference:'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, __weakDeviceHint ? 1.5 : 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace || THREE.sRGBEncoding;
@@ -1504,10 +1583,22 @@
     // gentle drift + camera-shake-linked parallax for a subtle sense of depth
     woodParX += (Math.sin(t*0.7)*3 + (camShake.t>0?(Math.random()-0.5)*camShake.mag*8:0) - woodParX)*Math.min(1,dt*2);
     woodParY += (Math.cos(t*0.5)*2 - woodParY)*Math.min(1,dt*2);
-    const overW = woodTex.width/(window.devicePixelRatio||1), overH = woodTex.height/(window.devicePixelRatio||1);
-    wctx.drawImage(woodTex, -((overW-w)/2)+woodParX, -((overH-h)/2)+woodParY, overW, overH);
-    // warm lantern-glow wash matching the current background mood colour
+    // shared parallax offset — used by every scene silhouette below (was
+    // previously re-declared inside a single if-block, which threw a
+    // ReferenceError for any background that wasn't temple-flavoured and
+    // silently froze the whole scene layer)
+    const px = -woodParX*0.3;
     const bg = currentBg ? currentBg() : null;
+
+    // full-scene painted backdrop — replaces the old dojo-wood-plank overlay
+    // so every background actually shows its own sky/mood instead of a
+    // wood texture bleeding through on top of it
+    if(bg && bg.sceneWash){
+      const sw = wctx.createLinearGradient(0,0,0,h);
+      bg.sceneWash.forEach(stop=>sw.addColorStop(stop[0], stop[1]));
+      wctx.fillStyle = sw; wctx.fillRect(0,0,w,h);
+    }
+    // warm lantern-glow wash matching the current background mood colour
     wctx.globalCompositeOperation = 'lighter';
     const warm = wctx.createRadialGradient(w*0.5,h*0.78,0,w*0.5,h*0.78,Math.max(w,h)*0.6);
     warm.addColorStop(0, 'rgba(255,150,70,0.10)');
@@ -1516,9 +1607,9 @@
     wctx.globalCompositeOperation = 'source-over';
 
     // distant temple/pagoda roofline glimpsed above the dojo wall — cheap
+
     // multi-triangle silhouette, drifts slower than the wall for depth
     if(bg && bg.temple){
-      const px = -woodParX*0.3;
       const roofH = Math.max(46, h*0.075);
       wctx.fillStyle = 'rgba(8,6,12,0.5)';
       const spacing = w/2.1;
@@ -1537,6 +1628,225 @@
         wctx.fill();
         wctx.fillRect(cx-1.4*scale, -rh*0.45, 2.8*scale, rh*0.45);
       }
+    }
+
+    // full moon glow, drifting a touch slower than everything else — used by
+    // temple-flavoured backgrounds to anchor the sakura/lantern atmosphere
+    if(bg && bg.moon){
+      const mx = w*0.78 + px*0.15, my = h*0.16;
+      const mr = Math.max(34, w*0.045);
+      const mg = wctx.createRadialGradient(mx,my,0,mx,my,mr*3.4);
+      mg.addColorStop(0, 'rgba(235,240,255,0.55)'); mg.addColorStop(0.35,'rgba(210,220,255,0.16)'); mg.addColorStop(1,'rgba(210,220,255,0)');
+      wctx.fillStyle = mg; wctx.beginPath(); wctx.arc(mx,my,mr*3.4,0,Math.PI*2); wctx.fill();
+      wctx.fillStyle = 'rgba(238,242,255,0.9)'; wctx.beginPath(); wctx.arc(mx,my,mr,0,Math.PI*2); wctx.fill();
+    }
+
+    // torii gate silhouette — the signature Ancient Japanese Temple set piece,
+    // sits centred behind the play area with a soft warm backlight
+    if(bg && bg.torii){
+      const cx = w*0.5 + px*0.4, baseY = h*0.98, gateW = Math.min(w*0.62, 520), gateH = Math.min(h*0.5, 360);
+      const legW = gateW*0.045;
+      wctx.save(); wctx.globalAlpha = 0.92; wctx.fillStyle = 'rgba(20,8,10,0.88)';
+      // pillars
+      wctx.fillRect(cx-gateW/2, baseY-gateH, legW, gateH);
+      wctx.fillRect(cx+gateW/2-legW, baseY-gateH, legW, gateH);
+      // top curved lintel (kasagi) — approximated with a filled arc band
+      wctx.beginPath();
+      wctx.moveTo(cx-gateW/2-legW*1.6, baseY-gateH+legW*2.6);
+      wctx.quadraticCurveTo(cx, baseY-gateH-legW*1.4, cx+gateW/2+legW*1.6, baseY-gateH+legW*2.6);
+      wctx.lineTo(cx+gateW/2+legW*1.2, baseY-gateH+legW*4.4);
+      wctx.quadraticCurveTo(cx, baseY-gateH+legW*1.6, cx-gateW/2-legW*1.2, baseY-gateH+legW*4.4);
+      wctx.closePath(); wctx.fill();
+      // second lower beam (nuki)
+      wctx.fillRect(cx-gateW/2+legW*0.4, baseY-gateH*0.62, gateW-legW*0.8, legW*0.7);
+      // warm backlight glow through the gate opening
+      const glow = wctx.createRadialGradient(cx, baseY-gateH*0.45, 0, cx, baseY-gateH*0.45, gateW*0.5);
+      glow.addColorStop(0, 'rgba(255,150,80,0.16)'); glow.addColorStop(1, 'rgba(255,150,80,0)');
+      wctx.globalCompositeOperation = 'lighter'; wctx.fillStyle = glow;
+      wctx.fillRect(cx-gateW/2, baseY-gateH, gateW, gateH);
+      wctx.restore();
+    }
+
+    // Cyber Tokyo skyline — layered dark tower silhouettes with glowing neon
+    // window strips + rain-slicked ground reflection, cheap flat-shaded shapes
+    if(bg && bg.cyber){
+      const t2 = performance.now()*0.001;
+      const bandY = h*0.62;
+      wctx.save();
+      // far skyline
+      wctx.fillStyle = 'rgba(8,10,22,0.85)';
+      let bx = px*0.15 - 60;
+      let seed = 7;
+      while(bx < w+80){
+        const rnd = mulberry32(Math.floor(bx)+seed)();
+        const bw = 46+rnd*70, bh = h*(0.18+rnd*0.3);
+        wctx.fillRect(bx, bandY-bh, bw, bh);
+        bx += bw*0.82;
+      }
+      // neon window strips + billboards on nearer buildings
+      bx = px*0.28 - 40; seed = 91;
+      const palette = ['#ff2bd6','#3dfff0','#7d5cff','#fff23d'];
+      while(bx < w+80){
+        const rnd = mulberry32(Math.floor(bx)+seed)();
+        const bw = 54+rnd*66, bh = h*(0.24+rnd*0.34);
+        wctx.fillStyle = 'rgba(4,5,14,0.92)';
+        wctx.fillRect(bx, bandY-bh, bw, bh);
+        // vertical neon sign strip
+        const col = palette[Math.floor(rnd*4)];
+        const flick = 0.55+Math.sin(t2*4+bx)*0.25+Math.sin(t2*9+bx*0.3)*0.2;
+        wctx.save(); wctx.globalAlpha = Math.max(0.15,flick); wctx.fillStyle = col; wctx.shadowBlur = 12; wctx.shadowColor = col;
+        wctx.fillRect(bx+bw*0.15, bandY-bh+bh*0.08, bw*0.14, bh*0.7);
+        wctx.restore();
+        // scattered lit windows
+        wctx.fillStyle = 'rgba(255,230,180,0.5)';
+        for(let wy=bandY-bh+10; wy<bandY-8; wy+=14){
+          for(let wx=bx+6; wx<bx+bw-6; wx+=11){
+            if(mulberry32(Math.floor(wx*3+wy*7)+seed)()>0.72) wctx.fillRect(wx,wy,3,4);
+          }
+        }
+        bx += bw*0.7;
+      }
+      // wet street reflection wash at the base
+      const wet = wctx.createLinearGradient(0,bandY,0,h);
+      wet.addColorStop(0,'rgba(120,60,180,0.10)'); wet.addColorStop(1,'rgba(20,10,40,0)');
+      wctx.fillStyle = wet; wctx.fillRect(0,bandY,w,h-bandY);
+      wctx.restore();
+    }
+
+    // Volcano Realm — dark cone silhouette with a glowing crater and
+    // slow-pulsing lava veins running down the slope
+    if(bg && bg.volcano){
+      const t2 = performance.now()*0.001;
+      const cx = w*0.5 + px*0.2, baseY = h*1.02, peakY = h*0.22, coneW = Math.min(w*0.66, 560);
+      wctx.save();
+      wctx.fillStyle = 'rgba(10,6,8,0.88)';
+      wctx.beginPath(); wctx.moveTo(cx-coneW/2, baseY); wctx.lineTo(cx-coneW*0.06, peakY); wctx.lineTo(cx+coneW*0.06, peakY); wctx.lineTo(cx+coneW/2, baseY); wctx.closePath(); wctx.fill();
+      const pulse = 0.55+Math.sin(t2*1.6)*0.35;
+      const crater = wctx.createRadialGradient(cx,peakY+6,0,cx,peakY+6,coneW*0.22);
+      crater.addColorStop(0, `rgba(255,140,40,${0.55*pulse})`); crater.addColorStop(1,'rgba(255,90,20,0)');
+      wctx.globalCompositeOperation='lighter'; wctx.fillStyle = crater; wctx.beginPath(); wctx.arc(cx,peakY+6,coneW*0.22,0,Math.PI*2); wctx.fill();
+      wctx.strokeStyle = `rgba(255,110,40,${0.5*pulse})`; wctx.lineWidth = 2; wctx.shadowBlur = 10; wctx.shadowColor = 'rgba(255,110,40,0.8)';
+      for(let i=-1;i<=1;i++){
+        wctx.beginPath(); wctx.moveTo(cx+i*coneW*0.05, peakY+10);
+        wctx.quadraticCurveTo(cx+i*coneW*0.18, baseY*0.6, cx+i*coneW*0.32, baseY);
+        wctx.stroke();
+      }
+      wctx.restore();
+    }
+
+    // Frozen Palace — pale blue crystalline towers with a soft ice-glow halo
+    if(bg && bg.ice){
+      const cx = w*0.5 + px*0.25, baseY = h*1.0;
+      wctx.save(); wctx.fillStyle = 'rgba(14,22,38,0.75)';
+      for(let i=-2;i<=2;i++){
+        const tw = 30+Math.abs(i)*6, tx = cx+i*w*0.09, th = h*(0.32-Math.abs(i)*0.05);
+        wctx.beginPath(); wctx.moveTo(tx-tw/2, baseY); wctx.lineTo(tx, baseY-th); wctx.lineTo(tx+tw/2, baseY); wctx.closePath(); wctx.fill();
+      }
+      const glow = wctx.createRadialGradient(cx,baseY-h*0.28,0,cx,baseY-h*0.28,w*0.3);
+      glow.addColorStop(0,'rgba(160,220,255,0.16)'); glow.addColorStop(1,'rgba(160,220,255,0)');
+      wctx.globalCompositeOperation='lighter'; wctx.fillStyle=glow; wctx.fillRect(0,0,w,h);
+      wctx.restore();
+    }
+
+    // Space Odyssey — a distant glowing planet with a thin ring, drifting slowly
+    if(bg && bg.space){
+      const t2 = performance.now()*0.0002;
+      const mx = w*0.8+px*0.1+Math.sin(t2)*10, my = h*0.22;
+      const pr = Math.max(40, w*0.06);
+      wctx.save();
+      const g = wctx.createRadialGradient(mx-pr*0.3,my-pr*0.3,0,mx,my,pr*1.4);
+      g.addColorStop(0,'rgba(255,200,150,0.95)'); g.addColorStop(0.6,'rgba(200,120,90,0.9)'); g.addColorStop(1,'rgba(120,60,60,0.4)');
+      wctx.fillStyle = g; wctx.beginPath(); wctx.arc(mx,my,pr,0,Math.PI*2); wctx.fill();
+      wctx.strokeStyle = 'rgba(220,200,255,0.5)'; wctx.lineWidth = 3;
+      wctx.beginPath(); wctx.ellipse(mx,my,pr*1.7,pr*0.4,-0.3,0,Math.PI*2); wctx.stroke();
+      wctx.restore();
+    }
+
+    // Underwater Kingdom — jagged coral reef silhouettes along the seabed
+    // plus a soft caustic-light shaft filtering from above
+    if(bg && bg.underwater){
+      const baseY = h*1.02;
+      wctx.save(); wctx.fillStyle = 'rgba(4,26,34,0.7)';
+      let cx2 = px*0.2-40, seed = 33;
+      while(cx2 < w+60){
+        const rnd = mulberry32(Math.floor(cx2)+seed)();
+        const cw = 40+rnd*50, ch = h*(0.14+rnd*0.16);
+        wctx.beginPath(); wctx.moveTo(cx2, baseY); wctx.lineTo(cx2+cw*0.5, baseY-ch); wctx.lineTo(cx2+cw, baseY); wctx.closePath(); wctx.fill();
+        cx2 += cw*0.8;
+      }
+      const ray = wctx.createLinearGradient(w*0.4,0,w*0.6,h);
+      ray.addColorStop(0,'rgba(140,220,255,0.10)'); ray.addColorStop(1,'rgba(140,220,255,0)');
+      wctx.globalCompositeOperation='lighter'; wctx.fillStyle=ray; wctx.fillRect(0,0,w,h);
+      wctx.restore();
+    }
+
+    // Haunted Forest — twisted bare tree silhouettes with a pale moon glow
+    if(bg && bg.hauntedforest){
+      const baseY = h*1.02;
+      wctx.save(); wctx.fillStyle = 'rgba(4,10,8,0.82)';
+      let tx = px*0.25-50, seed = 61;
+      while(tx < w+60){
+        const rnd = mulberry32(Math.floor(tx)+seed)();
+        const th = h*(0.28+rnd*0.28), tw = 5+rnd*4;
+        wctx.beginPath(); wctx.moveTo(tx-tw/2, baseY); wctx.lineTo(tx-tw/2, baseY-th*0.6); wctx.lineTo(tx+tw/2, baseY-th*0.6); wctx.lineTo(tx+tw/2, baseY); wctx.closePath(); wctx.fill();
+        for(let b=0;b<3;b++){
+          const bang = -0.9+b*0.9+rnd, blen = th*0.35;
+          wctx.beginPath(); wctx.moveTo(tx, baseY-th*0.6);
+          wctx.lineTo(tx+Math.cos(bang)*blen, baseY-th*0.6-Math.sin(bang)*blen*1.4);
+          wctx.lineWidth = 2; wctx.strokeStyle = 'rgba(4,10,8,0.82)'; wctx.stroke();
+        }
+        tx += 70+rnd*70;
+      }
+      wctx.restore();
+    }
+
+    // Golden Palace — grand pillared hall with warm gilded rim-light columns
+    if(bg && bg.goldenpalace){
+      const baseY = h*1.0;
+      wctx.save();
+      for(let i=-2;i<=2;i++){
+        const colX = w*0.5+px*0.2+i*w*0.16, colW = 14;
+        wctx.fillStyle = 'rgba(30,20,6,0.7)';
+        wctx.fillRect(colX-colW/2, baseY-h*0.6, colW, h*0.6);
+        const rim = wctx.createLinearGradient(colX-colW, 0, colX+colW, 0);
+        rim.addColorStop(0,'rgba(255,210,120,0)'); rim.addColorStop(0.5,'rgba(255,210,120,0.35)'); rim.addColorStop(1,'rgba(255,210,120,0)');
+        wctx.fillStyle = rim; wctx.fillRect(colX-colW, baseY-h*0.6, colW*2, h*0.6);
+      }
+      wctx.restore();
+    }
+
+    // Samurai Battlefield — torn war banners on poles against a smoky dusk sky
+    if(bg && bg.battlefield){
+      const baseY = h*1.0;
+      wctx.save();
+      let fx = px*0.22-30, seed = 19;
+      while(fx < w+40){
+        const rnd = mulberry32(Math.floor(fx)+seed)();
+        const poleH = h*(0.24+rnd*0.14);
+        wctx.strokeStyle = 'rgba(10,8,6,0.8)'; wctx.lineWidth = 3;
+        wctx.beginPath(); wctx.moveTo(fx, baseY); wctx.lineTo(fx, baseY-poleH); wctx.stroke();
+        const flap = Math.sin(performance.now()*0.001*2+rnd*10)*6;
+        wctx.fillStyle = 'rgba(140,20,20,0.55)';
+        wctx.beginPath(); wctx.moveTo(fx, baseY-poleH); wctx.lineTo(fx+26+flap, baseY-poleH+8); wctx.lineTo(fx, baseY-poleH+30); wctx.closePath(); wctx.fill();
+        fx += 150+rnd*140;
+      }
+      wctx.restore();
+    }
+
+    // Dragon Realm — a serpentine dragon silhouette gliding through misty peaks
+    if(bg && bg.dragon){
+      const t2 = performance.now()*0.0003;
+      const bx = w*0.5 + Math.sin(t2)*w*0.22 + px*0.15, by = h*0.24 + Math.cos(t2*1.4)*h*0.05;
+      wctx.save(); wctx.globalAlpha = 0.55; wctx.fillStyle = 'rgba(30,10,40,0.8)';
+      wctx.beginPath();
+      for(let i=0;i<7;i++){
+        const seg = i/6, sx = bx - seg*160 + Math.sin(t2*3+i)*10, sy = by + Math.sin(seg*4+t2*2)*22 + i*3;
+        const r = 14*(1-seg*0.7)+4;
+        wctx.moveTo(sx+r, sy); wctx.arc(sx, sy, r, 0, Math.PI*2);
+      }
+      wctx.fill();
+      wctx.beginPath(); wctx.moveTo(bx+8,by-4); wctx.lineTo(bx+30,by-22); wctx.lineTo(bx+14,by-2); wctx.closePath(); wctx.fill();
+      wctx.restore();
     }
   }
 
@@ -1737,17 +2047,17 @@
   let state = 'idle'; // idle | playing | paused | over
   let currentMode = 'classic'; // classic | arcade | zen | survival | hardcore
   const ARCADE_DURATION = 60; // seconds
-  const MODE_DURATIONS = { arcade: ARCADE_DURATION, zen: 90 }; // modes that run on a countdown
+  const MODE_DURATIONS = { arcade: ARCADE_DURATION, zen: 90, blitz: 30 }; // modes that run on a countdown
   const BONUS_FRUIT = { name:'bonus', peel:0xffcb47, flesh:0xfff6c8, radius:1.55, points:500, tex:texGold, isGolden:true, coinBonus:250 };
   let modeTimeLeft = 0, arcadeFinaleSpawned = false, arcadeFinaleTimer = 0;
-  function maxLivesForMode(){ return currentMode==='hardcore' ? 1 : 3; }
+  function maxLivesForMode(){ return currentMode==='hardcore' ? 1 : (currentMode==='chaos' ? 2 : 3); }
   function survivalOverdrive(){
     // Survival keeps climbing past the normal difficulty cap the longer the run goes.
     if(currentMode!=='survival') return 0;
     return Math.max(0, Math.min(1.4, (elapsed-260)/240));
   }
   let score = 0, lives = 3, best = 0, combo = 0, comboTimer = 0, bestComboRun = 0;
-  let coinsRun = 0, xpRun = 0, slicedRun = 0, powerupsRun = 0, bombHitRun = false, goldenSlicedRun = false;
+  let coinsRun = 0, gemsRun = 0, xpRun = 0, slicedRun = 0, powerupsRun = 0, bombHitRun = false, goldenSlicedRun = false;
   let scoreMultiplier = 1, doubleScoreTimer = 0, freezeTimer = 0, magnetTimer = 0;
   let timeScale = 1, slowmoTimer = 0;
   let hitStopTimer = 0; // brief cinematic freeze (50-100ms) triggered on critical slices
@@ -1798,6 +2108,8 @@
   function currentSpawnInterval(){
     let interval = SPAWN_INTERVAL_EASY - (SPAWN_INTERVAL_EASY-SPAWN_INTERVAL_MIN)*smoothDiff;
     if(bossCooldown>0) interval *= 1.7; // brief breather after a boss wave
+    if(currentMode==='blitz') interval *= 0.55; // nonstop chaos for the 30-second sprint
+    if(currentMode==='chaos') interval *= 0.75;
     return Math.max(SPAWN_INTERVAL_MIN, interval);
   }
   function currentBombChance(){
@@ -1805,6 +2117,8 @@
     const base = 0.06, max = 0.32;
     let chance = base + (max-base)*smoothDiff;
     if(currentMode==='survival') chance += survivalOverdrive()*0.15;
+    if(currentMode==='chaos') chance += 0.12; // higher risk, higher reward
+    if(currentMode==='bossrush') chance *= 0.6; // the bosses are the threat here, not a bomb minefield
     return Math.min(0.55, chance);
   }
   function choosePattern(){
@@ -1873,7 +2187,8 @@
     if(opts.forceDef){
       def = opts.forceDef;
     } else if(forceBoss){
-      def = Object.assign({}, BOSS_FRUIT, { hp:BOSS_FRUIT.hp });
+      const bossHp = currentMode==='bossrush' ? BOSS_FRUIT.hp+2 : BOSS_FRUIT.hp;
+      def = Object.assign({}, BOSS_FRUIT, { hp:bossHp });
     } else if(forcePowerup){
       def = Object.assign({}, POWERUPS[Math.floor(Math.random()*POWERUPS.length)], { isPowerup:true, radius:0.55 });
     } else {
@@ -1901,7 +2216,7 @@
     const spinScale = 1 + diff*0.85;
     const spin = new THREE.Vector3((Math.random()-0.5)*4*spinScale,(Math.random()-0.5)*4*spinScale,(Math.random()-0.5)*4*spinScale);
     activeFruits.push({ mesh, def, isBomb:def.name==='bomb', isPowerup:!!def.isPowerup, isBoss:!!def.isBoss,
-      hp:def.hp||1, pos:mesh.position, vel:new THREE.Vector3(vx,vy,0), spin, sliced:false, r:def.radius,
+      hp:def.hp||1, maxHp:def.hp||1, pos:mesh.position, vel:new THREE.Vector3(vx,vy,0), spin, sliced:false, r:def.radius,
       spawnT:performance.now(), wobblePhase:Math.random()*Math.PI*2 });
   }
 
@@ -1942,14 +2257,19 @@
     bossSpawnedAt = elapsed;
     spawnFruit(false, true);
     const b = visibleBounds();
-    const n = 4;
+    const n = currentMode==='bossrush' ? 5 : 4;
     for(let i=0;i<n;i++){
       const t = (i+0.5)/n;
       const x = -b.halfW*0.62 + t*b.halfW*1.24;
       spawnFruit(false,false,{ xOverride:x, noBomb:true });
     }
-    nextBossScore = score + 250 + Math.random()*50; // next wave 250-300 points later
-    bossCooldown = 6; // return briefly to relaxed pacing after the wave
+    if(currentMode==='bossrush'){
+      nextBossScore = score + 70 + Math.random()*30; // Boss Rush: waves fire constantly
+      bossCooldown = 1.5; // barely any breather — bosses are the whole point
+    } else {
+      nextBossScore = score + 250 + Math.random()*50; // next wave 250-300 points later
+      bossCooldown = 6; // return briefly to relaxed pacing after the wave
+    }
   }
 
   /* =========================================================================
@@ -1961,6 +2281,8 @@
   const livesRow = document.getElementById('livesRow');
   const coinValEl = document.getElementById('coinVal');
   const coinValShopEl = document.getElementById('coinValShop');
+  const gemValEl = document.getElementById('gemVal');
+  const gemValShopEl = document.getElementById('gemValShop');
   const arcadeTimerBadgeEl = document.getElementById('arcadeTimerBadge');
   const arcadeTimerValEl = document.getElementById('arcadeTimerVal');
   function updateArcadeTimerHud(){
@@ -1985,22 +2307,42 @@
     multLabelEl.textContent = 'x'+scoreMultiplier;
     coinValEl.textContent = Save.d.coins;
     coinValShopEl.textContent = Save.d.coins;
+    if(gemValEl) gemValEl.textContent = Save.d.gems||0;
+    if(gemValShopEl) gemValShopEl.textContent = Save.d.gems||0;
   }
 
   const powerupBar = document.getElementById('powerupBar');
+  // Cache one chip element per power-up type instead of tearing down and
+  // rebuilding the whole bar's DOM every frame — this ran 60x/sec while
+  // playing and was a real source of jank (layout + GC churn) on lower-end
+  // devices. Now a frame only touches the DOM when a power-up starts/ends,
+  // and steady-state frames just update a transform (cheap, no reflow).
+  const __powerupChips = {};
+  function __ensurePowerupChip(key, label){
+    if(__powerupChips[key]) return __powerupChips[key];
+    const chip = document.createElement('div');
+    chip.className = 'powerChip';
+    chip.innerHTML = '<span>'+label+'</span><span class="bar"><i></i></span>';
+    powerupBar.appendChild(chip);
+    const entry = { el:chip, fill:chip.querySelector('.bar i'), shown:false };
+    __powerupChips[key] = entry;
+    return entry;
+  }
   function renderPowerupBar(){
-    powerupBar.innerHTML = '';
     const items = [
       { key:'freeze', label:'❄️ Freeze', t:freezeTimer, max:4.5 },
       { key:'double', label:'✨ 2x Score', t:doubleScoreTimer, max:8 },
       { key:'magnet', label:'🧲 Magnet', t:magnetTimer, max:6 },
       { key:'slowmo', label:'⏳ Slow-Mo', t:slowmoTimer, max:3.5 },
     ];
-    items.filter(i=>i.t>0).forEach(i=>{
-      const chip = document.createElement('div');
-      chip.className = 'powerChip show';
-      chip.innerHTML = '<span>'+i.label+'</span><span class="bar"><i style="transform:scaleX('+(i.t/i.max)+')"></i></span>';
-      powerupBar.appendChild(chip);
+    items.forEach(i=>{
+      const active = i.t>0;
+      const entry = __ensurePowerupChip(i.key, i.label);
+      if(active !== entry.shown){
+        entry.el.classList.toggle('show', active);
+        entry.shown = active;
+      }
+      if(active) entry.fill.style.transform = 'scaleX('+(i.t/i.max)+')';
     });
   }
 
@@ -2279,10 +2621,21 @@
     slicedRun++; Save.d.stats.totalSliced++;
     let coinGain = f.def.isGolden ? (f.def.coinBonus||40) : (f.def.isLucky ? (f.def.coinBonus||18) : (Math.random()<0.45?(2+Math.floor(Math.random()*4)):0));
     if(currentMode==='hardcore' && coinGain>0) coinGain = Math.round(coinGain*1.5);
+    if(currentMode==='chaos' && coinGain>0) coinGain = Math.round(coinGain*1.75);
+    if(currentMode==='blitz' && coinGain>0) coinGain = Math.round(coinGain*1.3);
     if(magnetTimer>0) coinGain = Math.max(coinGain, 2);
-    if(f.isBoss){ coinGain += 30; score += 40; }
-    if(f.def.isGolden) goldenSlicedRun = true;
+    let gemGain = 0;
+    if(f.isBoss){
+      coinGain += 30; score += 40;
+      gemGain += (currentMode==='bossrush' ? 2 : 1);
+      Save.d.stats.bossesDefeated = (Save.d.stats.bossesDefeated||0)+1;
+    }
+    if(f.def.isGolden){
+      goldenSlicedRun = true;
+      if(Math.random() < 0.08) gemGain += 1;
+    }
     if(coinGain>0){ coinsRun += coinGain; Save.d.coins += coinGain; Save.d.stats.totalCoinsEarned += coinGain; Audio.SFX.coin(); }
+    if(gemGain>0){ gemsRun += gemGain; Save.d.gems = (Save.d.gems||0)+gemGain; Save.d.stats.totalGemsEarned = (Save.d.stats.totalGemsEarned||0)+gemGain; showToast('💎','+'+gemGain+' gem'+(gemGain>1?'s':'')+'!',1400); updateScoreHud(); }
 
     combo++; comboTimer = frenzyActive ? 1.3 : 0.95;
     bestComboRun = Math.max(bestComboRun, combo);
@@ -2290,7 +2643,7 @@
     if([5,10,15,20,25,30,40,50].includes(combo)){
       showComboBanner(combo+'x COMBO!');
       Audio.SFX.combo(combo);
-      const frenzyThreshold = currentMode==='arcade' ? 8 : 15;
+      const frenzyThreshold = (currentMode==='arcade'||currentMode==='blitz') ? 8 : 15;
       if(combo>=frenzyThreshold && !frenzyActive) triggerFrenzy();
     }
     updateMissionProgress('combo', 0); // progress uses max via direct set below
@@ -2299,7 +2652,7 @@
     updateMissionProgress('slice', 1);
     if(f.def.isGolden) updateMissionProgress('golden', 1);
     updateScoreHud();
-    checkAchievements({ runScore:score });
+    checkAchievements({ runScore:score, golden: !!f.def.isGolden });
     Save.save();
   }
 
@@ -2581,6 +2934,22 @@
       gctx.beginPath(); gctx.arc(s.x,s.y,r,0,Math.PI*2); gctx.fill();
     });
     gctx.globalCompositeOperation = 'source-over';
+    // Boss health bars — drawn in normal composite mode above the boss's glow
+    activeFruits.forEach(f=>{
+      if(!f.isBoss || !f.maxHp || f.maxHp<=1) return;
+      const s = worldToScreen(f.pos);
+      const bw = 74, bh = 8, bx = s.x-bw/2, by = s.y - (f.r*44) - 22;
+      const pct = Math.max(0, f.hp/f.maxHp);
+      gctx.fillStyle = 'rgba(10,8,6,0.75)';
+      gctx.fillRect(bx-2, by-2, bw+4, bh+4);
+      gctx.fillStyle = 'rgba(255,255,255,0.12)';
+      gctx.fillRect(bx, by, bw, bh);
+      const hpColor = pct>0.5 ? '198,255,61' : (pct>0.25 ? '255,180,60' : '255,70,60');
+      gctx.fillStyle = `rgba(${hpColor},0.95)`;
+      gctx.fillRect(bx, by, bw*pct, bh);
+      gctx.strokeStyle = 'rgba(255,255,255,0.35)'; gctx.lineWidth = 1;
+      gctx.strokeRect(bx, by, bw, bh);
+    });
   }
 
   // ---------------------------------------------------------------------
@@ -2606,6 +2975,13 @@
       case 'shadows': return { type, x:Math.random()*w, y:h*0.75+Math.random()*h*0.2, r:80+Math.random()*100, vx:(Math.random()-0.5)*4, a:0.05+Math.random()*0.04 };
       case 'wind': return { type, x:-40-Math.random()*w, y:h*0.15+Math.random()*h*0.7, len:60+Math.random()*90, vx:180+Math.random()*140, a:0.05+Math.random()*0.07, ph:Math.random()*Math.PI*2 };
       case 'firefly': return { type, x:Math.random()*w, y:h*0.35+Math.random()*h*0.55, r:1.4+Math.random()*1.6, vx:(Math.random()-0.5)*10, vy:(Math.random()-0.5)*8, a:0.5+Math.random()*0.4, ph:Math.random()*Math.PI*2, driftPh:Math.random()*Math.PI*2 };
+      case 'sakura': return { type, x:Math.random()*w, y:-20-Math.random()*h, r:4+Math.random()*4.5, vy:14+Math.random()*12, vx:(Math.random()-0.5)*10, rot:Math.random()*Math.PI*2, vr:(Math.random()-0.5)*2.4, flip:Math.random()*Math.PI*2, vflip:2+Math.random()*2, a:0.6+Math.random()*0.35, ph:Math.random()*Math.PI*2, hue: Math.random()<0.5?'#ffc2dd':'#ffe0ec' };
+      case 'neonrain': return { type, x:Math.random()*w, y:Math.random()*h, len:20+Math.random()*22, vy:640+Math.random()*260, vx:-90-Math.random()*40, a:0.25+Math.random()*0.25, hue: Math.random()<0.5?'#ff2bd6':'#3dfff0' };
+      case 'spark': return { type, x:40+Math.random()*(w-80), y:h*0.08+Math.random()*h*0.5, life:0, maxLife:0.12+Math.random()*0.22, wait:Math.random()*3, hue: ['#ff2bd6','#3dfff0','#fff23d','#7d5cff'][Math.floor(Math.random()*4)], ang:Math.random()*Math.PI*2 };
+      case 'hologram': return { type, x:Math.random()*w, y:h*(0.1+Math.random()*0.55), wd:60+Math.random()*160, ht:2+Math.random()*3, vx:(Math.random()-0.5)*10, a:0.05+Math.random()*0.09, ph:Math.random()*Math.PI*2, hue: Math.random()<0.5?'#3dfff0':'#ff2bd6' };
+      case 'snow': return { type, x:Math.random()*w, y:-20-Math.random()*h, r:2+Math.random()*3.4, vy:20+Math.random()*22, vx:(Math.random()-0.5)*18, a:0.5+Math.random()*0.4, ph:Math.random()*Math.PI*2 };
+      case 'ember': return { type, x:Math.random()*w, y:h*0.7+Math.random()*h*0.35, r:1.6+Math.random()*2.4, vy:-(20+Math.random()*36), vx:(Math.random()-0.5)*14, a:0.55+Math.random()*0.4, ph:Math.random()*Math.PI*2, hue: Math.random()<0.5?'#ff8a3b':'#ff3b1a' };
+      case 'bubble': return { type, x:Math.random()*w, y:h+20+Math.random()*h*0.3, r:2+Math.random()*5, vy:-(18+Math.random()*26), vx:(Math.random()-0.5)*10, a:0.28+Math.random()*0.3, ph:Math.random()*Math.PI*2 };
       default: return { type:'dust', x:Math.random()*w, y:Math.random()*h, r:0.6+Math.random()*1.8, vy:-(4+Math.random()*10), vx:(Math.random()-0.5)*6, a:0.15+Math.random()*0.3, ph:Math.random()*Math.PI*2 };
     }
   }
@@ -2616,10 +2992,10 @@
     const w = window.innerWidth, h = window.innerHeight;
     const area = w*h;
     const scale = Perf.particleScale();
-    const budgetByType = { dust:26000, leaves:60000, rain:9000, fog:220000, lantern:260000, candle:260000, rays:220000, shadows:220000, wind:340000, firefly:110000 };
+    const budgetByType = { dust:26000, leaves:60000, rain:9000, fog:220000, lantern:260000, candle:260000, rays:220000, shadows:220000, wind:340000, firefly:110000, sakura:52000, neonrain:8000, spark:400000, hologram:260000, snow:34000, ember:70000, bubble:46000 };
     activeAmbientTypes.forEach(type=>{
       const base = Math.min(46, Math.floor(area/(budgetByType[type]||26000)));
-      const lowCountType = type==='fog'||type==='lantern'||type==='candle'||type==='rays'||type==='shadows'||type==='wind';
+      const lowCountType = type==='fog'||type==='lantern'||type==='candle'||type==='rays'||type==='shadows'||type==='wind'||type==='spark'||type==='hologram';
       const count = Math.max(lowCountType ? 2 : 4, Math.floor(base*scale));
       for(let i=0;i<count;i++) dustParticles.push(makeAmbientParticle(type, w, h));
     });
@@ -2709,6 +3085,76 @@
           dctx.fillStyle = `rgba(255,255,240,${glow})`; dctx.beginPath(); dctx.arc(p.x,p.y,p.r*0.6,0,Math.PI*2); dctx.fill();
           break;
         }
+        case 'sakura': {
+          p.ph += dt; p.flip += p.vflip*dt; p.y += p.vy*dt; p.x += (p.vx + Math.sin(p.ph)*30)*dt; p.rot += p.vr*dt;
+          if(p.y > h+20){ p.y = -20; p.x = Math.random()*w; }
+          const squash = Math.abs(Math.cos(p.flip));
+          dctx.save(); dctx.translate(p.x,p.y); dctx.rotate(p.rot); dctx.globalAlpha = p.a*(0.5+squash*0.5);
+          dctx.fillStyle = p.hue; dctx.beginPath(); dctx.ellipse(0,0,p.r, p.r*0.55*squash+p.r*0.15,0,0,Math.PI*2); dctx.fill();
+          dctx.restore();
+          break;
+        }
+        case 'neonrain': {
+          p.y += p.vy*dt; p.x += p.vx*dt;
+          if(p.y > h){ p.y = -20; p.x = Math.random()*w; }
+          dctx.save(); dctx.globalAlpha = p.a; dctx.strokeStyle = p.hue; dctx.lineWidth = 1.6;
+          dctx.shadowBlur = 6; dctx.shadowColor = p.hue;
+          dctx.beginPath(); dctx.moveTo(p.x,p.y); dctx.lineTo(p.x+p.vx*0.03,p.y+p.len); dctx.stroke();
+          dctx.restore();
+          break;
+        }
+        case 'spark': {
+          p.wait -= dt;
+          if(p.wait<=0 && p.life<=0){ p.life = p.maxLife; }
+          if(p.life>0){
+            p.life -= dt;
+            const k = p.life/p.maxLife;
+            dctx.save(); dctx.translate(p.x,p.y); dctx.globalAlpha = k;
+            dctx.strokeStyle = p.hue; dctx.shadowBlur = 10; dctx.shadowColor = p.hue; dctx.lineWidth = 1.4;
+            for(let j=0;j<3;j++){
+              const a1 = p.ang + j*2.1 + Math.random()*0.6;
+              const len = 6+Math.random()*10;
+              dctx.beginPath(); dctx.moveTo(0,0); dctx.lineTo(Math.cos(a1)*len, Math.sin(a1)*len); dctx.stroke();
+            }
+            dctx.restore();
+            if(p.life<=0) p.wait = 1.5+Math.random()*3.5;
+          }
+          break;
+        }
+        case 'hologram': {
+          p.ph += dt*0.5; p.x += p.vx*dt;
+          if(p.x<-p.wd) p.x = w+p.wd; if(p.x>w+p.wd) p.x = -p.wd;
+          const flicker = p.a*(0.6+Math.sin(p.ph*6)*0.4);
+          dctx.save(); dctx.globalAlpha = Math.max(0,flicker); dctx.fillStyle = p.hue;
+          dctx.shadowBlur = 8; dctx.shadowColor = p.hue;
+          dctx.fillRect(p.x-p.wd/2, p.y, p.wd, p.ht);
+          dctx.restore();
+          break;
+        }
+        case 'snow': {
+          p.ph += dt; p.y += p.vy*dt; p.x += (p.vx + Math.sin(p.ph*0.8)*16)*dt;
+          if(p.y > h+10){ p.y = -10; p.x = Math.random()*w; }
+          dctx.globalAlpha = p.a; dctx.fillStyle = 'rgba(235,245,255,1)'; dctx.shadowBlur = 4; dctx.shadowColor = 'rgba(200,230,255,0.8)';
+          dctx.beginPath(); dctx.arc(p.x,p.y,p.r,0,Math.PI*2); dctx.fill(); dctx.shadowBlur = 0;
+          break;
+        }
+        case 'ember': {
+          p.ph += dt; p.y += p.vy*dt; p.x += (p.vx + Math.sin(p.ph*1.4)*12)*dt;
+          if(p.y < -10){ Object.assign(p, makeAmbientParticle('ember', w, h)); }
+          const flick = 0.6+Math.sin(t*6+p.ph)*0.4;
+          dctx.globalAlpha = p.a*Math.max(0.2,flick); dctx.fillStyle = p.hue; dctx.shadowBlur = 8; dctx.shadowColor = p.hue;
+          dctx.beginPath(); dctx.arc(p.x,p.y,p.r,0,Math.PI*2); dctx.fill(); dctx.shadowBlur = 0;
+          break;
+        }
+        case 'bubble': {
+          p.ph += dt*2; p.y += p.vy*dt; p.x += (p.vx + Math.sin(p.ph)*10)*dt;
+          if(p.y < -10){ Object.assign(p, makeAmbientParticle('bubble', w, h)); }
+          dctx.globalAlpha = p.a; dctx.strokeStyle = 'rgba(180,235,255,0.9)'; dctx.lineWidth = 1;
+          dctx.beginPath(); dctx.arc(p.x,p.y,p.r,0,Math.PI*2); dctx.stroke();
+          dctx.globalAlpha = p.a*0.4; dctx.fillStyle = 'rgba(180,235,255,1)';
+          dctx.beginPath(); dctx.arc(p.x-p.r*0.3,p.y-p.r*0.3,p.r*0.3,0,Math.PI*2); dctx.fill();
+          break;
+        }
         default: { // dust
           p.ph += dt; p.y += p.vy*dt; p.x += (p.vx + Math.sin(p.ph)*4)*dt;
           if(p.y < -10){ p.y = h+10; p.x = Math.random()*w; }
@@ -2719,6 +3165,7 @@
       }
     }
     dctx.globalAlpha = 1;
+    dctx.shadowBlur = 0;
   }
 
   function applyBackground(id){
@@ -2856,10 +3303,10 @@
     debris.slice().forEach(d=>releaseDebrisMesh(d.mesh));
     debris.length = 0;
     score = 0; lives = maxLivesForMode(); combo = 0; comboTimer = 0; elapsed = 0; spawnAcc = 0;
-    coinsRun = 0; xpRun = 0; slicedRun = 0; powerupsRun = 0; bombHitRun = false; goldenSlicedRun = false;
+    coinsRun = 0; gemsRun = 0; xpRun = 0; slicedRun = 0; powerupsRun = 0; bombHitRun = false; goldenSlicedRun = false;
     bestComboRun = 0; scoreMultiplier = 1; doubleScoreTimer = 0; freezeTimer = 0; magnetTimer = 0; slowmoTimer = 0;
     frenzyActive = false; frenzyTimer = 0; bossSpawnedAt = -999;
-    smoothDiff = 0; nextBossScore = 250 + Math.random()*50; bossCooldown = 0;
+    smoothDiff = 0; nextBossScore = currentMode==='bossrush' ? (30 + Math.random()*20) : (250 + Math.random()*50); bossCooldown = 0;
     frenzyBannerEl.classList.remove('show');
     trail = []; lastInputWorld = null;
     modeTimeLeft = MODE_DURATIONS[currentMode] || 0; arcadeFinaleSpawned = false; arcadeFinaleTimer = 0;
@@ -2891,7 +3338,7 @@
     if(state!=='playing') return;
     state = 'over';
     best = Math.max(best, score);
-    const bestKeys = { arcade:'bestArcadeScore', zen:'bestZenScore', survival:'bestSurvivalScore', hardcore:'bestHardcoreScore' };
+    const bestKeys = { arcade:'bestArcadeScore', zen:'bestZenScore', survival:'bestSurvivalScore', hardcore:'bestHardcoreScore', bossrush:'bestBossrushScore', blitz:'bestBlitzScore', chaos:'bestChaosScore' };
     if(bestKeys[currentMode]){
       Save.d[bestKeys[currentMode]] = Math.max(Save.d[bestKeys[currentMode]]||0, score);
     } else {
@@ -2909,12 +3356,13 @@
     Save.d.leaderboard.sort((a,b)=>b.score-a.score);
     Save.d.leaderboard = Save.d.leaderboard.slice(0,10);
     Save.save();
-    checkAchievements({ runScore:score });
+    checkAchievements({ runScore:score, noBomb: !bombHitRun });
 
     document.getElementById('goReason').textContent = reason;
     document.getElementById('finalScore').textContent = score;
     document.getElementById('bestScore').textContent = best;
     document.getElementById('goCoins').textContent = coinsRun;
+    document.getElementById('goGems').textContent = gemsRun;
     document.getElementById('goCombo').textContent = bestComboRun;
     document.getElementById('goXp').textContent = gained;
     gameOverScreen.classList.remove('hidden');
@@ -2928,6 +3376,9 @@
       Zen: ['modeBestZen', Save.d.bestZenScore],
       Survival: ['modeBestSurvival', Save.d.bestSurvivalScore],
       Hardcore: ['modeBestHardcore', Save.d.bestHardcoreScore],
+      Bossrush: ['modeBestBossrush', Save.d.bestBossrushScore],
+      Blitz: ['modeBestBlitz', Save.d.bestBlitzScore],
+      Chaos: ['modeBestChaos', Save.d.bestChaosScore],
     };
     Object.values(tagMap).forEach(([id, val])=>{
       const el = document.getElementById(id);
@@ -3041,7 +3492,7 @@
         <span class="rarityTag r-${item.rarity}">${item.rarity}</span>
         <div class="swatch" style="${swatchStyle}"></div>
         <div class="nm">${item.name}</div>
-        <div class="price">${owned? (equipped?'Equipped':'Owned') : '🪙 '+item.price}</div>
+        <div class="price">${owned? (equipped?'Equipped':'Owned') : (item.gemPrice ? '💎 '+item.gemPrice : '🪙 '+item.price)}</div>
       `;
       div.addEventListener('click', ()=>{
         Audio.SFX.click();
@@ -3049,6 +3500,18 @@
           Save.d[equippedKey] = item.id; Save.save();
           if(shopTab==='backgrounds') applyBackground(item.id);
           renderShop();
+        } else if(item.gemPrice){
+          if((Save.d.gems||0) >= item.gemPrice){
+            Save.d.gems -= item.gemPrice;
+            Save.d[unlockedKey].push(item.id);
+            Save.save();
+            Audio.SFX.unlock();
+            showToast('💎','Unlocked <b>'+item.name+'</b>!');
+            updateScoreHud();
+            renderShop();
+          } else {
+            showToast('💎','Not enough gems yet — defeat bosses to earn more!');
+          }
         } else if(Save.d.coins >= item.price){
           Save.d.coins -= item.price;
           Save.d[unlockedKey].push(item.id);
@@ -3638,7 +4101,7 @@
     Save.d.leaderboard.forEach((e,i)=>{
       const row = document.createElement('div');
       row.className = 'lbRow';
-      const modeLabels = { arcade:'Arcade', zen:'Zen', survival:'Survival', hardcore:'Hardcore' };
+      const modeLabels = { arcade:'Arcade', zen:'Zen', survival:'Survival', hardcore:'Hardcore', bossrush:'Boss Rush', blitz:'Blitz', chaos:'Chaos' };
       const modeTag = modeLabels[e.mode] ? ' · '+modeLabels[e.mode] : '';
       row.innerHTML = `<span class="rank">#${i+1}</span><span>${e.date}${modeTag}</span><span class="sc">${e.score}</span>`;
       list.appendChild(row);
@@ -3688,17 +4151,18 @@
     // Boss wave every ~250-300 score, only one at a time (requirement 6). Suppressed
     // in the closing seconds of Arcade Mode so it doesn't collide with the finale fruit.
     const nearArcadeFinale = currentMode==='arcade' && modeTimeLeft < 10;
-    if(score >= nextBossScore && elapsed > 20 && !activeFruits.some(f=>f.isBoss) && !nearArcadeFinale){
+    const bossGate = currentMode==='bossrush' ? 4 : 20;
+    if(score >= nextBossScore && elapsed > bossGate && !activeFruits.some(f=>f.isBoss) && !nearArcadeFinale){
       triggerBossWave();
       return;
     }
 
-    const arcadeSpeedup = currentMode==='arcade' ? 0.6 : 1;
+    const arcadeSpeedup = (currentMode==='arcade'||currentMode==='blitz') ? 0.6 : 1;
     const survivalSpeedup = currentMode==='survival' ? Math.max(0.55, 1 - survivalOverdrive()*0.35) : 1;
     const curInterval = currentSpawnInterval() * arcadeSpeedup * survivalSpeedup;
     if(spawnAcc > curInterval){
       spawnAcc = 0;
-      const powerupChance = currentMode==='arcade' ? 0.12 : 0.05;
+      const powerupChance = (currentMode==='arcade'||currentMode==='chaos') ? 0.12 : (currentMode==='blitz' ? 0.09 : 0.05);
       if(Math.random() < powerupChance){
         spawnFruit(true, false); // powerup
       } else {
@@ -3809,6 +4273,7 @@
       { label:'Add 1,000 Coins', fn:()=>{ Save.d.coins += 1000; refreshEverything(); showToast('🪙','+1,000 coins'); } },
       { label:'Add 10,000 Coins', fn:()=>{ Save.d.coins += 10000; refreshEverything(); showToast('🪙','+10,000 coins'); } },
       { label:'Add 100,000 Coins', fn:()=>{ Save.d.coins += 100000; refreshEverything(); showToast('🪙','+100,000 coins'); } },
+      { label:'Add 100 Gems', fn:()=>{ Save.d.gems = (Save.d.gems||0)+100; refreshEverything(); showToast('💎','+100 gems'); } },
       { label:'Max Coins', cls:'gold', fn:()=>{ Save.d.coins = 999999999; refreshEverything(); showToast('🪙','Coins maxed'); } },
       { label:'Add XP', fn:()=>{ Save.d.totalXp += 500; refreshEverything(); showToast('⭐','+500 XP'); } },
       { label:'Max XP', cls:'gold', fn:()=>{ Save.d.totalXp = 999999999; refreshEverything(); showToast('⭐','XP maxed'); } },
