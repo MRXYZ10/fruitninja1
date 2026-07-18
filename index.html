@@ -131,6 +131,7 @@
 
   /* ---------- Overlays ---------- */
   .overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; z-index:20; text-align:center; padding:24px; background:radial-gradient(ellipse at center, rgba(20,16,31,0.6), rgba(6,6,10,0.94)); backdrop-filter: blur(3px); animation:overlayIn .35s ease; overflow-y:auto; }
+  .hidden{ display:none !important; }
   .overlay.hidden{ display:none; }
   @keyframes overlayIn{ from{ opacity:0; } to{ opacity:1; } }
   .eyebrow{ font-size:11px; letter-spacing:0.3em; text-transform:uppercase; color:var(--accent-slash); margin-bottom:10px; }
@@ -166,6 +167,8 @@
   .menuTabs{ display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; justify-content:center; }
   .tabBtn{ font-size:11px; letter-spacing:0.06em; text-transform:uppercase; padding:8px 14px; border-radius:20px; border:1px solid var(--panel-line); background:transparent; color:var(--text-dim); cursor:pointer; transition:.15s; }
   .tabBtn.active{ background:var(--accent-slash); color:#0a0c12; border-color:var(--accent-slash); font-weight:700; }
+  .authTabBtn{ font-size:11px; letter-spacing:0.06em; text-transform:uppercase; padding:8px 14px; border-radius:20px; border:1px solid var(--panel-line); background:transparent; color:var(--text-dim); cursor:pointer; transition:.15s; }
+  .authTabBtn.active{ background:var(--accent-slash); color:#0a0c12; border-color:var(--accent-slash); font-weight:700; }
   .scrollArea{ overflow-y:auto; flex:1; padding:2px 4px; }
 
   .closeX{ position:absolute; top:16px; right:16px; width:36px; height:36px; border-radius:10px; border:1px solid var(--panel-line); background:rgba(20,16,31,0.85); color:var(--text-primary); font-size:16px; cursor:pointer; z-index:2; }
@@ -178,7 +181,19 @@
   }
   .shopItem:hover{ transform:translateY(-2px); border-color:var(--accent-slash-soft); }
   .shopItem.equipped{ border-color:var(--accent-slash); box-shadow:0 0 16px rgba(198,255,61,0.35); }
-  .shopItem .swatch{ width:44px; height:44px; border-radius:10px; }
+  .shopItem .swatch{ width:44px; height:44px; border-radius:10px; position:relative; overflow:hidden; }
+  .shopItem .swatch.anim-rainbow{ animation:swatchSpin 3s linear infinite; }
+  .shopItem .swatch.anim-dual{ background-size:220% 220%; animation:swatchDualShift 2.2s ease-in-out infinite; }
+  .shopItem .swatch.anim-sparkle{ animation:swatchPulseGlow 1.5s ease-in-out infinite; }
+  .shopItem .swatch.anim-shine::after{
+    content:''; position:absolute; inset:-40%;
+    background:linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.55) 48%, transparent 66%);
+    background-size:220% 220%; animation:swatchShineSweep 2.2s linear infinite;
+  }
+  @keyframes swatchSpin{ to{ transform:rotate(360deg); } }
+  @keyframes swatchDualShift{ 0%,100%{ background-position:0% 50%; } 50%{ background-position:100% 50%; } }
+  @keyframes swatchPulseGlow{ 0%,100%{ filter:brightness(1) saturate(1); box-shadow:0 0 0 rgba(255,255,255,0); } 50%{ filter:brightness(1.4) saturate(1.3); box-shadow:0 0 14px rgba(255,255,255,0.55); } }
+  @keyframes swatchShineSweep{ 0%{ background-position:-120% -120%; } 100%{ background-position:120% 120%; } }
   .shopItem .nm{ font-size:11px; font-weight:600; text-align:center; }
   .shopItem .price{ font-size:10px; color:var(--accent-gold); display:flex; align-items:center; gap:3px; }
   .rarityTag{ position:absolute; top:6px; left:6px; font-size:8px; padding:2px 6px; border-radius:6px; text-transform:uppercase; letter-spacing:0.05em; font-weight:700; }
@@ -618,6 +633,27 @@
   </div>
   <div id="pipLabel">hand feed</div>
 
+  <!-- LOGIN / ACCOUNT -->
+  <div class="overlay hidden" id="loginScreen">
+    <p class="eyebrow">Dojo Slash</p>
+    <h1 class="title" style="font-size:34px;">SIGN <span>IN</span></h1>
+    <p class="sub">Create a dojo account to keep your coins, gems and unlocks safe on this device — or jump straight in as a guest.</p>
+    <div class="btnRow" style="margin-bottom:14px;">
+      <button class="authTabBtn active" id="authTabLogin" data-authtab="login">Login</button>
+      <button class="authTabBtn" id="authTabRegister" data-authtab="register">Create Account</button>
+    </div>
+    <input type="text" id="authUserInput" class="devInput" placeholder="Username" maxlength="20" autocomplete="off" spellcheck="false" style="max-width:320px;">
+    <input type="password" id="authPassInput" class="devInput" placeholder="Password" maxlength="40" autocomplete="off" style="max-width:320px; margin-top:10px;">
+    <input type="password" id="authPassConfirmInput" class="devInput hidden" placeholder="Confirm password" maxlength="40" autocomplete="off" style="max-width:320px; margin-top:10px;">
+    <p id="authError" style="color:#ff6a6a; font-size:12px; min-height:16px; margin-top:10px;"></p>
+    <div class="btnRow" style="margin-top:6px;">
+      <button class="btn" id="authSubmitBtn">Login</button>
+    </div>
+    <div class="btnRow" style="margin-top:14px;">
+      <button class="btn secondary small" id="authGuestBtn">Continue as Guest</button>
+    </div>
+  </div>
+
   <!-- NAME ENTRY -->
   <div class="overlay hidden" id="nameScreen">
     <p class="eyebrow">Welcome to Dojo Slash</p>
@@ -712,6 +748,18 @@
             <div class="nm">CHAOS</div>
             <div class="ds">2 lives, way more bombs and powerups flying. +75% coins for surviving the storm.</div>
             <div class="bestTag" id="modeBestChaos"></div>
+          </div>
+          <div class="modeCard" id="modeCardPrecision" data-mode="precision" style="--mode-glow: rgba(255,255,255,0.5);">
+            <div class="icon">🎯</div>
+            <div class="nm">PRECISION</div>
+            <div class="ds">One life, calmer spawns, fewer bombs. Every clean slice pays double coins.</div>
+            <div class="bestTag" id="modeBestPrecision"></div>
+          </div>
+          <div class="modeCard" id="modeCardGauntlet" data-mode="gauntlet" style="--mode-glow: rgba(255,90,90,0.55);">
+            <div class="icon">⚔️</div>
+            <div class="nm">GAUNTLET</div>
+            <div class="ds">45 seconds. 2 lives, the densest spawns and bombs in the dojo. +40% coins.</div>
+            <div class="bestTag" id="modeBestGauntlet"></div>
           </div>
         </div>
       </div>
@@ -898,6 +946,8 @@
       <h1 class="title" style="font-size:26px;">SETTINGS</h1>
       <div class="scrollArea">
         <div class="settingRow"><label>Player Name</label><button class="btn secondary small" id="changeNameBtn" style="padding:8px 16px;">Change Name</button></div>
+        <div class="settingRow"><label>Account</label><span id="acctLabel" style="font-size:11px; color:var(--text-dim);"></span></div>
+        <div class="settingRow"><label>&nbsp;</label><button class="btn secondary small" id="logoutBtn" style="padding:8px 16px;">🚪 Logout</button></div>
         <div class="settingRow"><label>Invite Friends</label><button class="btn secondary small" id="inviteBtnSettings" style="padding:8px 16px;">🎁 Invite</button></div>
         <div class="settingRow"><label>Camera Sensitivity</label><input type="range" id="sensSlider" min="0.5" max="2" step="0.05" value="1"></div>
         <div class="settingRow"><label>Music Volume</label><input type="range" id="musicSlider" min="0" max="1" step="0.05" value="0.5"></div>
@@ -981,12 +1031,74 @@
   "use strict";
 
   /* =========================================================================
+     ACCOUNT / LOGIN MODULE
+     Fully client-side (no server exists for this game), so accounts live in
+     this browser's localStorage only — same device/browser = same account.
+     A returning guest (no account) keeps using the original single save slot
+     so nobody's existing progress is lost by this update.
+  ========================================================================= */
+  const Auth = (function(){
+    const USERS_KEY = 'dojoSlash_users_v1';
+    const SESSION_KEY = 'dojoSlash_session_v1';
+    function loadUsers(){ try{ return JSON.parse(localStorage.getItem(USERS_KEY)||'{}'); }catch(e){ return {}; } }
+    function saveUsers(u){ try{ localStorage.setItem(USERS_KEY, JSON.stringify(u)); }catch(e){} }
+    async function hash(pw){
+      const s = 'dojoSlash::'+pw;
+      if(window.crypto && window.crypto.subtle && window.crypto.subtle.digest){
+        try{
+          const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+          return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+        }catch(e){ /* fall through to fallback hash below */ }
+      }
+      let h = 0;
+      for(let i=0;i<s.length;i++){ h = (h*31 + s.charCodeAt(i)) | 0; }
+      return 'fb'+Math.abs(h).toString(16);
+    }
+    function currentUser(){ try{ return localStorage.getItem(SESSION_KEY)||''; }catch(e){ return ''; } }
+    function setSession(v){ try{ localStorage.setItem(SESSION_KEY, v); }catch(e){} }
+    function isGuest(){ return currentUser()==='GUEST'; }
+    function isLoggedIn(){ const s = currentUser(); return !!s && s!=='GUEST'; }
+    function saveKey(){
+      const s = currentUser();
+      return isLoggedIn() ? 'dojoSlash_save_v2__'+s.toLowerCase() : 'dojoSlash_save_v2';
+    }
+    async function register(username, password, confirm){
+      username = (username||'').trim();
+      if(username.length < 3) return { ok:false, error:'Username must be at least 3 characters.' };
+      if(!/^[a-zA-Z0-9_]+$/.test(username)) return { ok:false, error:'Use only letters, numbers and underscore.' };
+      if((password||'').length < 4) return { ok:false, error:'Password must be at least 4 characters.' };
+      if(password !== confirm) return { ok:false, error:'Passwords do not match.' };
+      const users = loadUsers();
+      const key = username.toLowerCase();
+      if(users[key]) return { ok:false, error:'That username is already taken.' };
+      users[key] = { username, passHash: await hash(password), createdAt:Date.now() };
+      saveUsers(users);
+      setSession(username);
+      return { ok:true, username };
+    }
+    async function login(username, password){
+      username = (username||'').trim();
+      if(!username || !password) return { ok:false, error:'Enter a username and password.' };
+      const users = loadUsers();
+      const rec = users[username.toLowerCase()];
+      if(!rec) return { ok:false, error:'No account found with that username.' };
+      const h = await hash(password);
+      if(h !== rec.passHash) return { ok:false, error:'Incorrect password.' };
+      setSession(rec.username);
+      return { ok:true, username:rec.username };
+    }
+    function continueAsGuest(){ setSession('GUEST'); }
+    function logout(){ try{ localStorage.removeItem(SESSION_KEY); }catch(e){} }
+    return { register, login, logout, continueAsGuest, currentUser, isGuest, isLoggedIn, saveKey };
+  })();
+
+  /* =========================================================================
      SAVE / PROGRESSION MODULE
   ========================================================================= */
   const Save = (function(){
-    const KEY = 'dojoSlash_save_v2';
+    const KEY = Auth.saveKey();
     const defaults = {
-      coins:0, gems:0, totalXp:0, bestScore:0, bestArcadeScore:0, bestZenScore:0, bestSurvivalScore:0, bestHardcoreScore:0, bestBossrushScore:0, bestBlitzScore:0, bestChaosScore:0, playerId:'', lastMysteryClaim:'', playerName:'',
+      coins:0, gems:0, totalXp:0, bestScore:0, bestArcadeScore:0, bestZenScore:0, bestSurvivalScore:0, bestHardcoreScore:0, bestBossrushScore:0, bestBlitzScore:0, bestChaosScore:0, bestPrecisionScore:0, bestGauntletScore:0, playerId:'', lastMysteryClaim:'', playerName:'',
       referralCode:'', referredBy:'', referralUsed:false, referralInvites:0, referralCoinsEarned:0, referralHistory:[],
       equippedKnife:'k_basic', equippedTrail:'t_lime', equippedBg:'bg_dojo',
       unlockedKnives:['k_basic'], unlockedTrails:['t_lime'], unlockedBg:['bg_dojo'],
@@ -1153,83 +1265,92 @@
   const KNIVES = [
     // common
     { id:'k_basic', name:'Dojo Blade', rarity:'common', price:0, color:0xd8d8de, trailHint:'#c6ff3d' },
-    { id:'k_wooden', name:'Wooden Knife', rarity:'common', price:20, color:0xa9814a, trailHint:'#c9a86a' },
-    { id:'k_bamboo', name:'Bamboo Sword', rarity:'common', price:30, color:0x9bc36a, trailHint:'#bfe08a' },
-    { id:'k_kitchen', name:'Kitchen Knife', rarity:'common', price:45, color:0xd6d6da, trailHint:'#e8e8ee' },
-    { id:'k_jade', name:'Jade Edge', rarity:'common', price:60, color:0x3ddc84, trailHint:'#3ddc84' },
-    { id:'k_chef', name:'Chef Knife', rarity:'common', price:75, color:0xc0c0c8, trailHint:'#dcdce6' },
-    { id:'k_copper', name:'Copper Fang', rarity:'common', price:100, color:0xd08a4d, trailHint:'#ffb066' },
+    { id:'k_forge', name:'Forged Iron', rarity:'common', price:25, color:0x9a9aa4, trailHint:'#cfd6ff' },
+    { id:'k_bronze', name:'Bronze Fang', rarity:'common', price:45, color:0xc98a4a, trailHint:'#ffbf7a' },
+    { id:'k_willow', name:'Willow Branch', rarity:'common', price:65, color:0x8fae5a, trailHint:'#c8e08a' },
+    { id:'k_marble', name:'Marble Edge', rarity:'common', price:85, color:0xe4e0da, trailHint:'#f2efe6' },
+    { id:'k_coral', name:'Coral Shard', rarity:'common', price:110, color:0xff9a8a, trailHint:'#ffb3a6' },
     // rare
-    { id:'k_butcher', name:'Butcher Knife', rarity:'rare', price:190, color:0xb0b0b8, trailHint:'#ff5c5c' },
-    { id:'k_steel', name:'Steel Ronin', rarity:'rare', price:240, color:0xbfd7ff, trailHint:'#8fc4ff' },
-    { id:'k_crimson', name:'Crimson Tanto', rarity:'rare', price:300, color:0xff4d5e, trailHint:'#ff5c72' },
-    { id:'k_azure', name:'Azure Katana', rarity:'rare', price:350, color:0x4da8ff, trailHint:'#4da8ff' },
-    { id:'k_samurai', name:'Samurai Katana', rarity:'rare', price:420, color:0xe8e8f0, trailHint:'#ffcb47' },
-    { id:'k_ninja', name:'Ninja Blade', rarity:'rare', price:510, color:0x2a2a34, trailHint:'#8fc4ff' },
+    { id:'k_stormsteel', name:'Storm Steel', rarity:'rare', price:260, color:0x7fa8ff, trailHint:'#7fa8ff' },
+    { id:'k_wildfire', name:'Wildfire Tanto', rarity:'rare', price:320, color:0xff5c3b, trailHint:'#ff8a5c' },
+    { id:'k_jadefang', name:'Jade Fang Katana', rarity:'rare', price:380, color:0x3ddc84, trailHint:'#6dffb0' },
+    { id:'k_moonshard', name:'Moonshard Blade', rarity:'rare', price:440, color:0xcfd8ff, trailHint:'#dfe6ff' },
+    { id:'k_venom', name:'Venomtip Kunai', rarity:'rare', price:500, color:0x9dff2b, trailHint:'#c6ff6a' },
     // epic
-    { id:'k_violet', name:'Violet Fang', rarity:'epic', price:940, color:0xb15cff, trailHint:'#c68bff' },
-    { id:'k_inferno', name:'Inferno Cleaver', rarity:'epic', price:1100, color:0xff6a2b, trailHint:'#ff8a3b', animated:true },
-    { id:'k_glacier', name:'Glacier Shard', rarity:'epic', price:1200, color:0x8ff2ff, trailHint:'#8ff2ff', animated:true },
-    { id:'k_toxic', name:'Toxic Fang', rarity:'epic', price:1300, color:0x9dff2b, trailHint:'#9dff2b', animated:true },
-    { id:'k_crystal', name:'Crystal Blade', rarity:'epic', price:1450, color:0xaef2ff, trailHint:'#c8f7ff', animated:true },
-    { id:'k_fire', name:'Fire Blade', rarity:'epic', price:1600, color:0xff7a2b, trailHint:'#ff9a3b', animated:true },
-    { id:'k_iceblade', name:'Ice Blade', rarity:'epic', price:1800, color:0x9fe8ff, trailHint:'#bff2ff', animated:true },
-    { id:'k_thunder', name:'Thunder Blade', rarity:'epic', price:2000, color:0xfff27a, trailHint:'#fff27a', animated:true },
-    { id:'k_plasma', name:'Plasma Sword', rarity:'epic', price:2250, color:0xff5cf0, trailHint:'#ff8cf5', animated:true },
-    { id:'k_shadow', name:'Shadow Blade', rarity:'epic', price:2500, color:0x1a1a24, trailHint:'#7d5cff', animated:true },
+    { id:'k_solarflare', name:'Solar Flare Cleaver', rarity:'epic', price:980, color:0xff9a2b, trailHint:'#ffcf6a', animated:true },
+    { id:'k_glacialfang', name:'Glacial Fang', rarity:'epic', price:1180, color:0x8ff2ff, trailHint:'#bff7ff', animated:true },
+    { id:'k_voltedge', name:'Volt Edge', rarity:'epic', price:1400, color:0xfff27a, trailHint:'#fff9c2', animated:true },
+    { id:'k_orchidblade', name:'Orchid Blade', rarity:'epic', price:1650, color:0xd66aff, trailHint:'#e8a6ff', animated:true },
+    { id:'k_emberfang', name:'Ember Fang Katana', rarity:'epic', price:1900, color:0xff5c2b, trailHint:'#ff8a5c', animated:true },
+    { id:'k_nightshade', name:'Nightshade Dagger', rarity:'epic', price:2150, color:0x6a3bd6, trailHint:'#a67dff', animated:true },
     // legendary
-    { id:'k_phantom', name:'Phantom Edge', rarity:'legendary', price:4550, color:0x2b2b40, trailHint:'#7d5cff', animated:true },
-    { id:'k_solaris', name:'Solaris Blade', rarity:'legendary', price:5600, color:0xffd23f, trailHint:'#ffd23f', animated:true },
-    { id:'k_voidripper', name:'Void Ripper', rarity:'legendary', price:6650, color:0x160018, trailHint:'#ff2bd6', animated:true },
-    { id:'k_dragonsword', name:'Dragon Sword', rarity:'legendary', price:7700, color:0xff3b3b, trailHint:'#ff6a3b', animated:true },
-    { id:'k_galaxysword', name:'Galaxy Sword', rarity:'legendary', price:8750, color:0x5c3bff, trailHint:'#9d7dff', animated:true },
-    { id:'k_neonsaber', name:'Neon Saber', rarity:'legendary', price:9800, color:0x3dffe0, trailHint:'#3dffe0', animated:true },
-    { id:'k_demonkatana', name:'Demon Katana', rarity:'legendary', price:10800, color:0x8a0f0f, trailHint:'#ff2b2b', animated:true },
-    { id:'k_phoenix', name:'Phoenix Blade', rarity:'legendary', price:12200, color:0xff8c2b, trailHint:'#ffcf6a', animated:true },
+    { id:'k_stormlord', name:'Stormlord Katana', rarity:'legendary', price:5400, color:0x4da8ff, trailHint:'#7fc4ff', animated:true },
+    { id:'k_infernofang', name:'Inferno Fang', rarity:'legendary', price:6500, color:0xff3b1a, trailHint:'#ff8a3b', animated:true },
+    { id:'k_frostmourne', name:'Frostmourne Edge', rarity:'legendary', price:7600, color:0xaef2ff, trailHint:'#d6faff', animated:true },
+    { id:'k_dragonclaw', name:'Dragonclaw Sword', rarity:'legendary', price:8800, color:0xff2b2b, trailHint:'#ff6a3b', animated:true },
+    { id:'k_shadowreaper', name:'Shadow Reaper', rarity:'legendary', price:10200, color:0x1a1a24, trailHint:'#8a5cff', animated:true },
+    { id:'k_solariskatana', name:'Solaris Katana', rarity:'legendary', price:11800, color:0xffd23f, trailHint:'#ffe37a', animated:true },
     // mythic
-    { id:'k_celestial', name:'Celestial Aurora', rarity:'mythic', price:21000, color:0xffffff, trailHint:'#aaffee', animated:true, mythic:true },
-    { id:'k_dragonlord', name:'Dragonlord Fang', rarity:'mythic', price:26200, color:0xff2b2b, trailHint:'#ff5c2b', animated:true, mythic:true },
-    { id:'k_eclipse', name:'Eclipse Reaper', rarity:'mythic', price:31500, color:0x0a0a12, trailHint:'#c6ff3d', animated:true, mythic:true },
-    { id:'k_golden_katana', name:'Golden Katana', rarity:'mythic', price:36800, color:0xffcb47, trailHint:'#ffe08a', animated:true, mythic:true },
-    { id:'k_diamond_katana', name:'Diamond Katana', rarity:'mythic', price:42000, color:0xe0f7ff, trailHint:'#ffffff', animated:true, mythic:true },
-    { id:'k_emerald', name:'Emerald Blade', rarity:'mythic', price:45500, color:0x2be86a, trailHint:'#7dffb0', animated:true, mythic:true },
-    { id:'k_ruby', name:'Ruby Blade', rarity:'mythic', price:49000, color:0xe0203f, trailHint:'#ff5c72', animated:true, mythic:true },
-    { id:'k_genesis', name:'Genesis Origin', rarity:'mythic', price:52500, color:0xffe08a, trailHint:'#ffe08a', animated:true, mythic:true },
+    { id:'k_celestialflare', name:'Celestial Flare', rarity:'mythic', price:22500, color:0xffffff, trailHint:'#aef7ff', animated:true, mythic:true },
+    { id:'k_voidreaper', name:'Void Reaper', rarity:'mythic', price:28800, color:0x0a0a12, trailHint:'#c6ff3d', animated:true, mythic:true },
+    { id:'k_phoenixking', name:'Phoenixking Blade', rarity:'mythic', price:35500, color:0xff7a2b, trailHint:'#ffce6a', animated:true, mythic:true },
+    { id:'k_diamondstorm', name:'Diamondstorm Katana', rarity:'mythic', price:44500, color:0xe0f7ff, trailHint:'#ffffff', animated:true, mythic:true },
     // ultimate
-    { id:'k_obsidian', name:'Obsidian Blade', rarity:'ultimate', price:112000, color:0x0c0c10, trailHint:'#c6ff3d', animated:true, mythic:true },
-    { id:'k_ghostblade', name:'Ghost Blade', rarity:'ultimate', price:140000, color:0xdfefff, trailHint:'#eafcff', animated:true, mythic:true },
-    { id:'k_cyberblade', name:'Cyber Blade', rarity:'ultimate', price:175000, color:0x00f0ff, trailHint:'#ff2bd6', animated:true, mythic:true },
+    { id:'k_eclipseblade', name:'Eclipse Blade', rarity:'ultimate', price:118000, color:0x0c0c10, trailHint:'#c6ff3d', animated:true, mythic:true },
+    { id:'k_cybersamurai', name:'Cybersamurai Edge', rarity:'ultimate', price:148000, color:0x00f0ff, trailHint:'#ff2bd6', animated:true, mythic:true },
+    { id:'k_godslayer', name:'Godslayer Katana', rarity:'ultimate', price:182000, color:0xffe08a, trailHint:'#ffffff', animated:true, mythic:true },
+    // premium additions
+    { id:'k_crimsononi', name:'Crimson Oni Blade', rarity:'epic', price:2400, color:0xff2b3b, trailHint:'#ff6a7a', animated:true },
+    { id:'k_junglethorn', name:'Junglethorn Machete', rarity:'epic', price:1750, color:0x4ade6a, trailHint:'#9dffb0', animated:true },
+    { id:'k_tidalkris', name:'Tidal Kris', rarity:'legendary', price:9200, color:0x2bd6ff, trailHint:'#8ff2ff', animated:true },
+    { id:'k_ashenwarden', name:'Ashen Warden', rarity:'legendary', price:12600, color:0x8a8a94, trailHint:'#ffcf6a', animated:true },
+    { id:'k_serpentscale', name:'Serpentscale Wakizashi', rarity:'legendary', price:14200, color:0x3bdc9a, trailHint:'#8ffce0', animated:true },
+    { id:'k_novaprism', name:'Nova Prism Blade', rarity:'mythic', price:38500, color:0xffffff, trailHint:'#ff2bd6', animated:true, mythic:true },
+    { id:'k_abysswraith', name:'Abyss Wraith Edge', rarity:'mythic', price:42000, color:0x1a0a2b, trailHint:'#5c3bff', animated:true, mythic:true },
+    { id:'k_originsingularity', name:'Origin Singularity', rarity:'ultimate', price:210000, color:0x0a0a0a, trailHint:'#ffffff', animated:true, mythic:true },
   ];
+  // TRAILS support a `style` field that drives real, live animation while
+  // slicing — not just a different flat color:
+  //   'dual'    -> the slash trail smoothly breathes between color and color2
+  //   'sparkle' -> the slash trail flickers with bright white glints
+  //   'rainbow' (color:'rainbow') -> continuously cycles through the hue wheel
+  // Anything without a `style` renders as a clean solid-color trail.
   const TRAILS = [
     // common
     { id:'t_lime', name:'Lime Streak', rarity:'common', price:0, color:'#c6ff3d' },
-    { id:'t_ember', name:'Ember Streak', rarity:'common', price:40, color:'#ff8c3b' },
-    { id:'t_pixel', name:'Pixel Trail', rarity:'common', price:75, color:'#7dffb0' },
+    { id:'t_frost', name:'Frost Trail', rarity:'common', price:50, color:'#8fe0ff' },
+    { id:'t_amber', name:'Amber Trail', rarity:'common', price:90, color:'#ffb35c' },
     // rare
-    { id:'t_ice', name:'Ice Streak', rarity:'rare', price:210, color:'#8ff2ff' },
-    { id:'t_royal', name:'Royal Violet', rarity:'rare', price:280, color:'#b15cff' },
-    { id:'t_fire', name:'Fire Trail', rarity:'rare', price:330, color:'#ff5c2b' },
-    { id:'t_smoke', name:'Smoke Trail', rarity:'rare', price:380, color:'#9a9aa4' },
-    { id:'t_lightning', name:'Lightning Trail', rarity:'rare', price:470, color:'#fff27a' },
+    { id:'t_stormy', name:'Stormy Blue', rarity:'rare', price:240, color:'#4da8ff', style:'dual', color2:'#ffffff' },
+    { id:'t_wildrose', name:'Wildrose Trail', rarity:'rare', price:300, color:'#ff6a9e' },
+    { id:'t_venomtrail', name:'Venom Trail', rarity:'rare', price:360, color:'#9dff2b' },
+    { id:'t_duskember', name:'Dusk Ember', rarity:'rare', price:420, color:'#ff8a3b', style:'dual', color2:'#ffe37a' },
+    { id:'t_silverstreak', name:'Silver Streak', rarity:'rare', price:480, color:'#dcdce6' },
     // epic
-    { id:'t_rose', name:'Rose Gold', rarity:'epic', price:940, color:'#ff9bc2' },
-    { id:'t_sakura', name:'Sakura Trail', rarity:'epic', price:1050, color:'#ffb3d6' },
-    { id:'t_stars', name:'Stars Trail', rarity:'epic', price:1150, color:'#e8e8ff' },
-    { id:'t_neon', name:'Neon Trail', rarity:'epic', price:1250, color:'#3dffe0' },
-    { id:'t_blood', name:'Blood Trail', rarity:'epic', price:1350, color:'#c41f2f' },
+    { id:'t_orchidglow', name:'Orchid Glow', rarity:'epic', price:980, color:'#d66aff', style:'dual', color2:'#ff9bea' },
+    { id:'t_cyberpulse', name:'Cyber Pulse', rarity:'epic', price:1120, color:'#3dffe0', style:'sparkle' },
+    { id:'t_bloodmoon', name:'Blood Moon', rarity:'epic', price:1280, color:'#c41f2f', style:'dual', color2:'#ff6a3b' },
+    { id:'t_starlight', name:'Starlight Trail', rarity:'epic', price:1420, color:'#e8e8ff', style:'sparkle' },
     // legendary
-    { id:'t_rainbow', name:'Rainbow Surge', rarity:'legendary', price:5600, color:'rainbow' },
-    { id:'t_crystal', name:'Crystal Trail', rarity:'legendary', price:6650, color:'#aef2ff' },
-    { id:'t_golden', name:'Golden Trail', rarity:'legendary', price:8050, color:'#ffcb47' },
-    { id:'t_laser', name:'Laser Trail', rarity:'legendary', price:9450, color:'#ff2b6a' },
-    { id:'t_galaxy', name:'Galaxy Trail', rarity:'legendary', price:11200, color:'#5c3bff' },
+    { id:'t_auroraveil', name:'Aurora Veil', rarity:'legendary', price:5800, color:'#8ff2ff', style:'dual', color2:'#b15cff' },
+    { id:'t_infernowave', name:'Inferno Wave', rarity:'legendary', price:6900, color:'#ff3b1a', style:'dual', color2:'#ffd23f' },
+    { id:'t_galacticrift', name:'Galactic Rift', rarity:'legendary', price:8200, color:'#5c3bff', style:'sparkle' },
+    { id:'t_prism', name:'Prism Surge', rarity:'legendary', price:9600, color:'rainbow' },
     // mythic
-    { id:'t_void', name:'Void Trail', rarity:'mythic', price:22800, color:'#ff2bd6' },
-    { id:'t_darkenergy', name:'Dark Energy Trail', rarity:'mythic', price:29700, color:'#3b0a55' },
-    { id:'t_holyaura', name:'Holy Aura Trail', rarity:'mythic', price:36800, color:'#fff6d8' },
-    { id:'t_electric', name:'Electric Trail', rarity:'mythic', price:43800, color:'#5cf7ff' },
+    { id:'t_voidpulse', name:'Void Pulse', rarity:'mythic', price:24000, color:'#ff2bd6', style:'dual', color2:'#3b0a55' },
+    { id:'t_holyflame', name:'Holy Flame', rarity:'mythic', price:31500, color:'#fff6d8', style:'dual', color2:'#ffcb47' },
+    { id:'t_electricstorm', name:'Electric Storm', rarity:'mythic', price:39500, color:'#5cf7ff', style:'sparkle' },
     // ultimate
-    { id:'t_dragonflame', name:'Dragon Flame Trail', rarity:'ultimate', price:122000, color:'#ff6a00' },
+    { id:'t_dragonsbreath', name:"Dragon's Breath", rarity:'ultimate', price:128000, color:'#ff6a00', style:'dual', color2:'#ffe37a' },
+    // premium additions
+    { id:'t_emeraldpulse', name:'Emerald Pulse', rarity:'rare', price:520, color:'#3ddc84', style:'dual', color2:'#eafff2' },
+    { id:'t_solarburst', name:'Solar Burst', rarity:'epic', price:1550, color:'#ffcf3d', style:'sparkle' },
+    { id:'t_crimsontide', name:'Crimson Tide', rarity:'epic', price:1680, color:'#ff2b3b', style:'dual', color2:'#ffb35c' },
+    { id:'t_glacialdrift', name:'Glacial Drift', rarity:'legendary', price:10400, color:'#8ff2ff', style:'dual', color2:'#dcefff' },
+    { id:'t_venomstorm', name:'Venom Storm', rarity:'legendary', price:11200, color:'#9dff2b', style:'sparkle' },
+    { id:'t_shadowveil', name:'Shadow Veil', rarity:'mythic', price:41000, color:'#2b0a3b', style:'dual', color2:'#8a5cff' },
+    { id:'t_novacascade', name:'Nova Cascade', rarity:'mythic', price:43500, color:'rainbow' },
+    { id:'t_eternumflare', name:'Eternum Flare', rarity:'ultimate', price:135000, color:'#ffe08a', style:'dual', color2:'#ffffff' },
   ];
   const BACKGROUNDS = [
     { id:'bg_dojo', name:'Ancient Japanese Temple', rarity:'common', price:0,
@@ -1304,6 +1425,182 @@
       grad:'radial-gradient(70% 50% at 50% 0%, rgba(160,100,255,0.24), transparent 70%), radial-gradient(50% 40% at 80% 20%, rgba(255,170,110,0.18), transparent 70%), radial-gradient(30% 30% at 15% 80%, rgba(80,110,220,0.12), transparent 70%)',
       sceneWash:[[0,'rgba(5,4,16,0.94)'],[0.5,'rgba(12,9,32,0.72)'],[1,'rgba(2,2,9,0.94)']],
       ambient:['dust','firefly'], space:true },
+    { id:'bg_sakuradawn', name:'Sakura Battlefield Dawn', rarity:'epic', price:2100,
+      grad:'radial-gradient(70% 55% at 50% 10%, rgba(255,170,200,0.2), transparent 70%), radial-gradient(60% 40% at 50% 100%, rgba(255,120,80,0.14), transparent 70%), radial-gradient(30% 20% at 15% 15%, rgba(255,200,150,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(34,14,20,0.9)'],[0.45,'rgba(62,24,24,0.55)'],[1,'rgba(10,6,8,0.88)']],
+      ambient:['sakura','ember','dust'], temple:true, torii:true, battlefield:true },
+    { id:'bg_celestialobs', name:'Celestial Observatory', rarity:'legendary', price:9800,
+      grad:'radial-gradient(70% 55% at 50% 0%, rgba(150,170,255,0.22), transparent 70%), radial-gradient(50% 40% at 80% 90%, rgba(255,220,160,0.14), transparent 70%), radial-gradient(30% 25% at 15% 20%, rgba(200,180,255,0.12), transparent 70%)',
+      sceneWash:[[0,'rgba(4,6,18,0.94)'],[0.5,'rgba(10,14,34,0.66)'],[1,'rgba(2,3,8,0.94)']],
+      ambient:['dust','firefly','rays'], space:true, moon:true },
+    { id:'bg_crimsondragon', name:'Crimson Dragon Peak', rarity:'mythic', price:52000,
+      grad:'radial-gradient(70% 60% at 50% 10%, rgba(255,60,40,0.28), transparent 70%), radial-gradient(50% 40% at 80% 100%, rgba(255,150,60,0.18), transparent 70%), radial-gradient(30% 30% at 15% 80%, rgba(120,20,20,0.14), transparent 70%)',
+      sceneWash:[[0,'rgba(22,4,4,0.92)'],[0.5,'rgba(50,10,8,0.6)'],[1,'rgba(6,2,2,0.92)']],
+      ambient:['ember','fog','firefly'], dragon:true, volcano:true },
+    { id:'bg_glacialcyber', name:'Glacial Cybercore', rarity:'ultimate', price:95000,
+      grad:'radial-gradient(70% 55% at 50% 0%, rgba(80,255,240,0.28), transparent 70%), radial-gradient(50% 40% at 20% 90%, rgba(255,60,200,0.18), transparent 70%), radial-gradient(30% 25% at 85% 20%, rgba(160,220,255,0.14), transparent 70%)',
+      sceneWash:[[0,'rgba(4,14,20,0.92)'],[0.5,'rgba(8,28,36,0.62)'],[1,'rgba(2,6,9,0.92)']],
+      ambient:['neonrain','snow','spark','hologram'], cyber:true, ice:true },
+    { id:'bg_bambooisle', name:'Bamboo Isle', rarity:'common', price:300,
+      grad:'radial-gradient(70% 55% at 50% 10%, rgba(150,220,120,0.16), transparent 70%), radial-gradient(60% 40% at 50% 100%, rgba(90,160,80,0.12), transparent 70%), radial-gradient(30% 20% at 15% 15%, rgba(200,255,180,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(10,22,10,0.9)'],[0.45,'rgba(20,40,18,0.55)'],[1,'rgba(4,8,4,0.88)']],
+      ambient:['leaves','wind','dust'], temple:true },
+    { id:'bg_mistyharbor', name:'Misty Harbor', rarity:'rare', price:700,
+      grad:'radial-gradient(60% 45% at 50% 100%, rgba(120,180,200,0.18), transparent 70%), radial-gradient(35% 25% at 20% 10%, rgba(200,220,230,0.12), transparent 70%), radial-gradient(30% 20% at 80% 15%, rgba(90,140,170,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(6,16,20,0.92)'],[0.5,'rgba(10,28,34,0.65)'],[1,'rgba(2,8,10,0.92)']],
+      ambient:['fog','bubble','dust'], underwater:true },
+    { id:'bg_emberdusk', name:'Ember Dusk Valley', rarity:'rare', price:900,
+      grad:'radial-gradient(60% 40% at 50% 100%, rgba(255,120,40,0.2), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(255,180,80,0.14), transparent 70%), radial-gradient(30% 20% at 20% 15%, rgba(160,40,20,0.12), transparent 70%)',
+      sceneWash:[[0,'rgba(20,8,4,0.9)'],[0.5,'rgba(46,18,8,0.58)'],[1,'rgba(6,3,2,0.9)']],
+      ambient:['ember','dust','wind'], volcano:true },
+    { id:'bg_shadowkeep', name:'Shadow Keep', rarity:'epic', price:1950,
+      grad:'radial-gradient(60% 40% at 50% 100%, rgba(140,60,180,0.16), transparent 70%), radial-gradient(35% 25% at 20% 10%, rgba(90,30,120,0.14), transparent 70%), radial-gradient(30% 20% at 80% 15%, rgba(60,20,80,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(10,4,14,0.92)'],[0.5,'rgba(22,8,28,0.6)'],[1,'rgba(4,2,6,0.92)']],
+      ambient:['shadows','ember','fog'], battlefield:true },
+    { id:'bg_frostshrine', name:'Frost Shrine', rarity:'epic', price:2300,
+      grad:'radial-gradient(70% 55% at 50% 10%, rgba(170,220,255,0.2), transparent 70%), radial-gradient(60% 40% at 50% 100%, rgba(140,200,255,0.14), transparent 70%), radial-gradient(30% 20% at 15% 10%, rgba(255,240,255,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(8,14,26,0.92)'],[0.45,'rgba(16,30,50,0.58)'],[1,'rgba(3,6,12,0.9)']],
+      ambient:['snow','lantern','dust'], temple:true, ice:true },
+    { id:'bg_ghostlywoods', name:'Ghostly Moonwoods', rarity:'epic', price:2600,
+      grad:'radial-gradient(60% 40% at 50% 100%, rgba(120,180,160,0.16), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(200,220,210,0.12), transparent 70%), radial-gradient(30% 20% at 20% 15%, rgba(60,90,80,0.12), transparent 70%)',
+      sceneWash:[[0,'rgba(4,10,10,0.92)'],[0.5,'rgba(8,20,18,0.65)'],[1,'rgba(2,4,4,0.92)']],
+      ambient:['fog','firefly','wind'], hauntedforest:true, moon:true },
+    { id:'bg_neonharbor', name:'Neon Harbor Nights', rarity:'legendary', price:8600,
+      grad:'radial-gradient(70% 50% at 50% 0%, rgba(60,240,255,0.24), transparent 70%), radial-gradient(50% 40% at 20% 90%, rgba(255,60,200,0.18), transparent 70%), radial-gradient(30% 30% at 85% 20%, rgba(255,255,100,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(4,10,20,0.92)'],[0.5,'rgba(8,20,40,0.62)'],[1,'rgba(2,4,10,0.92)']],
+      ambient:['neonrain','hologram','spark'], cyber:true },
+    { id:'bg_dragonsky', name:'Dragon Sky Fortress', rarity:'legendary', price:9600,
+      grad:'radial-gradient(70% 60% at 50% 10%, rgba(255,120,60,0.2), transparent 70%), radial-gradient(50% 40% at 80% 100%, rgba(255,180,100,0.14), transparent 70%), radial-gradient(30% 30% at 15% 80%, rgba(140,40,20,0.12), transparent 70%)',
+      sceneWash:[[0,'rgba(18,8,4,0.9)'],[0.5,'rgba(40,16,8,0.58)'],[1,'rgba(6,3,2,0.9)']],
+      ambient:['ember','fog','firefly'], dragon:true, battlefield:true },
+    { id:'bg_voidtemple', name:'Void Temple', rarity:'mythic', price:48000,
+      grad:'radial-gradient(70% 60% at 50% 0%, rgba(140,100,255,0.24), transparent 70%), radial-gradient(50% 40% at 80% 100%, rgba(200,180,255,0.16), transparent 70%), radial-gradient(30% 30% at 15% 80%, rgba(60,40,120,0.14), transparent 70%)',
+      sceneWash:[[0,'rgba(8,4,18,0.92)'],[0.5,'rgba(16,10,36,0.65)'],[1,'rgba(3,2,8,0.92)']],
+      ambient:['dust','firefly','rays'], temple:true, space:true },
+    { id:'bg_goldendragonthrone', name:'Golden Dragon Throne', rarity:'ultimate', price:99000,
+      grad:'radial-gradient(70% 60% at 50% 0%, rgba(255,215,120,0.32), transparent 70%), radial-gradient(50% 40% at 80% 100%, rgba(255,140,60,0.2), transparent 70%), radial-gradient(30% 30% at 15% 80%, rgba(255,255,255,0.14), transparent 70%)',
+      sceneWash:[[0,'rgba(24,16,4,0.85)'],[0.5,'rgba(48,30,6,0.5)'],[1,'rgba(8,5,2,0.85)']],
+      ambient:['candle','rays','ember'], goldenpalace:true, dragon:true },
+    { id:'bg_ridgemonastery', name:'Ridge Monastery', rarity:'rare', price:850,
+      grad:'radial-gradient(70% 55% at 50% 10%, rgba(200,190,220,0.16), transparent 70%), radial-gradient(60% 40% at 50% 100%, rgba(255,180,120,0.12), transparent 70%), radial-gradient(30% 20% at 15% 15%, rgba(255,200,150,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(20,18,26,0.9)'],[0.45,'rgba(40,32,40,0.55)'],[1,'rgba(8,7,10,0.88)']],
+      ambient:['fog','lantern','wind'], temple:true },
+    { id:'bg_crystalcavern', name:'Crystal Cavern', rarity:'epic', price:2050,
+      grad:'radial-gradient(70% 55% at 50% 10%, rgba(190,230,255,0.2), transparent 70%), radial-gradient(60% 40% at 50% 100%, rgba(220,240,255,0.14), transparent 70%), radial-gradient(30% 20% at 15% 15%, rgba(255,255,255,0.12), transparent 70%)',
+      sceneWash:[[0,'rgba(6,14,24,0.92)'],[0.45,'rgba(12,28,46,0.58)'],[1,'rgba(2,6,10,0.9)']],
+      ambient:['snow','rays','dust'], ice:true },
+    { id:'bg_infernalgate', name:'Infernal Gate', rarity:'epic', price:2450,
+      grad:'radial-gradient(60% 40% at 50% 100%, rgba(255,80,20,0.22), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(255,160,40,0.14), transparent 70%), radial-gradient(30% 20% at 20% 15%, rgba(120,10,10,0.14), transparent 70%)',
+      sceneWash:[[0,'rgba(16,4,4,0.92)'],[0.5,'rgba(40,10,6,0.6)'],[1,'rgba(5,2,2,0.92)']],
+      ambient:['ember','shadows','dust'], volcano:true, battlefield:true },
+    { id:'bg_lunarreef', name:'Lunar Reef', rarity:'legendary', price:8900,
+      grad:'radial-gradient(60% 45% at 50% 100%, rgba(120,180,220,0.2), transparent 70%), radial-gradient(35% 25% at 20% 10%, rgba(210,220,255,0.14), transparent 70%), radial-gradient(30% 20% at 80% 15%, rgba(90,140,200,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(4,12,22,0.92)'],[0.5,'rgba(8,24,42,0.65)'],[1,'rgba(2,6,12,0.92)']],
+      ambient:['bubble','firefly','dust'], underwater:true, moon:true },
+    { id:'bg_starforgedspire', name:'Starforged Spire', rarity:'mythic', price:49500,
+      grad:'radial-gradient(70% 60% at 50% 0%, rgba(255,220,150,0.26), transparent 70%), radial-gradient(50% 40% at 80% 100%, rgba(160,140,255,0.16), transparent 70%), radial-gradient(30% 30% at 15% 80%, rgba(255,255,255,0.12), transparent 70%)',
+      sceneWash:[[0,'rgba(10,8,20,0.92)'],[0.5,'rgba(22,16,42,0.62)'],[1,'rgba(3,3,8,0.92)']],
+      ambient:['dust','rays','firefly'], space:true, goldenpalace:true },
+    { id:'bg_eternaldojo', name:'Eternal Dojo', rarity:'ultimate', price:105000,
+      grad:'radial-gradient(70% 60% at 50% 10%, rgba(255,180,220,0.24), transparent 70%), radial-gradient(50% 40% at 50% 100%, rgba(255,140,80,0.16), transparent 70%), radial-gradient(30% 30% at 15% 15%, rgba(255,220,180,0.12), transparent 70%)',
+      sceneWash:[[0,'rgba(26,14,20,0.88)'],[0.45,'rgba(52,26,26,0.52)'],[1,'rgba(9,6,7,0.86)']],
+      ambient:['sakura','ember','firefly','fog'], temple:true, torii:true, dragon:true },
+    { id:'bg_junglecanopy', name:'Jungle Canopy', rarity:'common', price:220,
+      grad:'radial-gradient(70% 55% at 50% 10%, rgba(120,200,100,0.18), transparent 70%), radial-gradient(60% 40% at 50% 100%, rgba(60,140,70,0.14), transparent 70%), radial-gradient(30% 20% at 15% 15%, rgba(200,255,160,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(8,18,8,0.9)'],[0.45,'rgba(16,34,14,0.55)'],[1,'rgba(3,6,3,0.88)']],
+      ambient:['leaves','wind','firefly'], temple:true },
+    { id:'bg_desertmirage', name:'Desert Mirage', rarity:'rare', price:620,
+      grad:'radial-gradient(70% 55% at 50% 10%, rgba(255,190,110,0.2), transparent 70%), radial-gradient(60% 40% at 50% 100%, rgba(220,140,60,0.14), transparent 70%), radial-gradient(30% 20% at 15% 15%, rgba(255,225,170,0.12), transparent 70%)',
+      sceneWash:[[0,'rgba(30,18,6,0.88)'],[0.45,'rgba(58,34,10,0.5)'],[1,'rgba(10,6,2,0.86)']],
+      ambient:['dust','wind','rays'], battlefield:true },
+    { id:'bg_crimsonshogunate', name:'Crimson Shogunate', rarity:'epic', price:2250,
+      grad:'radial-gradient(60% 40% at 50% 100%, rgba(200,30,50,0.2), transparent 70%), radial-gradient(35% 25% at 20% 10%, rgba(255,90,90,0.14), transparent 70%), radial-gradient(30% 20% at 80% 15%, rgba(140,10,20,0.12), transparent 70%)',
+      sceneWash:[[0,'rgba(20,4,6,0.92)'],[0.5,'rgba(46,8,10,0.6)'],[1,'rgba(6,2,2,0.92)']],
+      ambient:['sakura','ember','shadows'], temple:true, torii:true, battlefield:true },
+    { id:'bg_prismrealm', name:'Prism Realm', rarity:'mythic', price:47000,
+      grad:'radial-gradient(70% 55% at 50% 0%, rgba(255,80,220,0.26), transparent 70%), radial-gradient(50% 40% at 80% 90%, rgba(80,220,255,0.2), transparent 70%), radial-gradient(30% 25% at 15% 20%, rgba(255,240,120,0.14), transparent 70%)',
+      sceneWash:[[0,'rgba(6,4,16,0.92)'],[0.5,'rgba(14,10,34,0.64)'],[1,'rgba(2,2,8,0.92)']],
+      ambient:['spark','hologram','dust','firefly'], cyber:true, space:true },
+    { id:'bg_riversidedojo', name:'Riverside Dojo', rarity:'common', price:180,
+      grad:'radial-gradient(70% 55% at 50% 10%, rgba(150,200,180,0.16), transparent 70%), radial-gradient(60% 40% at 50% 100%, rgba(90,150,140,0.12), transparent 70%), radial-gradient(30% 20% at 15% 15%, rgba(200,240,220,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(8,18,16,0.9)'],[0.45,'rgba(16,32,28,0.55)'],[1,'rgba(3,6,5,0.88)']],
+      ambient:['fog','leaves','dust'], temple:true },
+    { id:'bg_meadowshrine', name:'Meadow Shrine', rarity:'common', price:340,
+      grad:'radial-gradient(70% 55% at 50% 10%, rgba(200,230,140,0.18), transparent 70%), radial-gradient(60% 40% at 50% 100%, rgba(150,200,90,0.12), transparent 70%), radial-gradient(30% 20% at 15% 15%, rgba(255,240,180,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(16,20,6,0.88)'],[0.45,'rgba(32,38,12,0.5)'],[1,'rgba(6,8,3,0.86)']],
+      ambient:['leaves','wind','lantern'], temple:true, torii:true },
+    { id:'bg_twilightmarsh', name:'Twilight Marsh', rarity:'rare', price:520,
+      grad:'radial-gradient(60% 40% at 50% 100%, rgba(90,140,110,0.18), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(150,200,170,0.12), transparent 70%), radial-gradient(30% 20% at 20% 15%, rgba(40,80,60,0.14), transparent 70%)',
+      sceneWash:[[0,'rgba(4,12,10,0.92)'],[0.5,'rgba(8,24,18,0.65)'],[1,'rgba(2,5,4,0.92)']],
+      ambient:['fog','firefly','dust'], hauntedforest:true },
+    { id:'bg_goldensavanna', name:'Golden Savanna', rarity:'rare', price:740,
+      grad:'radial-gradient(70% 55% at 50% 10%, rgba(255,210,120,0.2), transparent 70%), radial-gradient(60% 40% at 50% 100%, rgba(220,160,70,0.14), transparent 70%), radial-gradient(30% 20% at 15% 15%, rgba(255,235,180,0.12), transparent 70%)',
+      sceneWash:[[0,'rgba(28,18,6,0.88)'],[0.45,'rgba(54,34,10,0.5)'],[1,'rgba(9,6,2,0.86)']],
+      ambient:['dust','wind','rays'], battlefield:true },
+    { id:'bg_icyfjord', name:'Icy Fjord', rarity:'rare', price:800,
+      grad:'radial-gradient(60% 40% at 50% 100%, rgba(150,220,255,0.2), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(210,240,255,0.14), transparent 70%), radial-gradient(30% 20% at 20% 15%, rgba(120,170,220,0.12), transparent 70%)',
+      sceneWash:[[0,'rgba(6,16,28,0.92)'],[0.5,'rgba(12,32,52,0.6)'],[1,'rgba(2,8,16,0.92)']],
+      ambient:['snow','dust','wind'], ice:true },
+    { id:'bg_duskbayou', name:'Dusk Bayou', rarity:'rare', price:880,
+      grad:'radial-gradient(60% 45% at 50% 100%, rgba(90,160,150,0.18), transparent 70%), radial-gradient(35% 25% at 20% 10%, rgba(180,210,190,0.12), transparent 70%), radial-gradient(30% 20% at 80% 15%, rgba(60,110,100,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(4,16,16,0.92)'],[0.5,'rgba(8,28,26,0.66)'],[1,'rgba(2,7,7,0.92)']],
+      ambient:['fog','bubble','wind'], underwater:true },
+    { id:'bg_thunderpeak', name:'Thunder Peak', rarity:'epic', price:1300,
+      grad:'radial-gradient(60% 40% at 50% 100%, rgba(140,150,220,0.2), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(200,210,255,0.14), transparent 70%), radial-gradient(30% 20% at 20% 15%, rgba(80,80,140,0.12), transparent 70%)',
+      sceneWash:[[0,'rgba(8,8,22,0.92)'],[0.5,'rgba(18,18,42,0.62)'],[1,'rgba(3,3,10,0.92)']],
+      ambient:['ember','shadows','rays'], battlefield:true },
+    { id:'bg_mysticgrotto', name:'Mystic Grotto', rarity:'epic', price:1650,
+      grad:'radial-gradient(60% 45% at 50% 100%, rgba(90,220,200,0.2), transparent 70%), radial-gradient(35% 25% at 20% 10%, rgba(180,255,230,0.14), transparent 70%), radial-gradient(30% 20% at 80% 15%, rgba(120,90,220,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(3,20,18,0.92)'],[0.5,'rgba(6,36,32,0.65)'],[1,'rgba(1,8,7,0.92)']],
+      ambient:['bubble','firefly','dust'], underwater:true },
+    { id:'bg_witheredgraveyard', name:'Withered Graveyard', rarity:'epic', price:1900,
+      grad:'radial-gradient(60% 40% at 50% 100%, rgba(120,130,110,0.16), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(190,200,180,0.12), transparent 70%), radial-gradient(30% 20% at 20% 15%, rgba(50,60,50,0.14), transparent 70%)',
+      sceneWash:[[0,'rgba(6,8,6,0.92)'],[0.5,'rgba(12,16,12,0.65)'],[1,'rgba(2,3,2,0.92)']],
+      ambient:['fog','shadows','firefly'], hauntedforest:true },
+    { id:'bg_lanternfestival', name:'Lantern Festival', rarity:'epic', price:2200,
+      grad:'radial-gradient(70% 55% at 50% 10%, rgba(255,160,90,0.2), transparent 70%), radial-gradient(60% 40% at 50% 100%, rgba(255,110,90,0.14), transparent 70%), radial-gradient(30% 20% at 15% 15%, rgba(255,220,170,0.12), transparent 70%)',
+      sceneWash:[[0,'rgba(30,14,10,0.9)'],[0.45,'rgba(58,26,16,0.55)'],[1,'rgba(9,5,4,0.88)']],
+      ambient:['lantern','sakura','dust'], temple:true, torii:true },
+    { id:'bg_frostpeakmonastery', name:'Frostpeak Monastery', rarity:'epic', price:2500,
+      grad:'radial-gradient(70% 55% at 50% 10%, rgba(190,225,255,0.2), transparent 70%), radial-gradient(60% 40% at 50% 100%, rgba(150,200,255,0.14), transparent 70%), radial-gradient(30% 20% at 15% 15%, rgba(255,245,255,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(8,14,26,0.92)'],[0.45,'rgba(16,30,50,0.58)'],[1,'rgba(3,6,12,0.9)']],
+      ambient:['snow','lantern','wind'], ice:true, temple:true },
+    { id:'bg_solarforge', name:'Solar Forge', rarity:'legendary', price:7200,
+      grad:'radial-gradient(65% 45% at 50% 40%, rgba(255,150,20,0.28), transparent 70%), radial-gradient(35% 25% at 80% 10%, rgba(255,220,90,0.18), transparent 70%), radial-gradient(30% 20% at 20% 15%, rgba(200,60,10,0.14), transparent 70%)',
+      sceneWash:[[0,'rgba(12,4,2,0.94)'],[0.5,'rgba(48,14,6,0.65)'],[1,'rgba(4,1,1,0.94)']],
+      ambient:['ember','rays','dust'], volcano:true },
+    { id:'bg_abysscathedral', name:'Abyss Cathedral', rarity:'legendary', price:8000,
+      grad:'radial-gradient(60% 45% at 50% 100%, rgba(60,80,160,0.22), transparent 70%), radial-gradient(35% 25% at 20% 10%, rgba(120,140,220,0.14), transparent 70%), radial-gradient(30% 20% at 80% 15%, rgba(30,30,80,0.14), transparent 70%)',
+      sceneWash:[[0,'rgba(2,4,14,0.94)'],[0.5,'rgba(6,10,30,0.7)'],[1,'rgba(1,2,7,0.94)']],
+      ambient:['bubble','shadows','dust'], underwater:true, battlefield:true },
+    { id:'bg_skyshrine', name:'Sky Shrine', rarity:'legendary', price:8700,
+      grad:'radial-gradient(70% 55% at 50% 0%, rgba(180,200,255,0.22), transparent 70%), radial-gradient(50% 40% at 80% 90%, rgba(255,230,180,0.14), transparent 70%), radial-gradient(30% 25% at 15% 20%, rgba(220,200,255,0.12), transparent 70%)',
+      sceneWash:[[0,'rgba(4,6,18,0.94)'],[0.5,'rgba(10,14,34,0.66)'],[1,'rgba(2,3,8,0.94)']],
+      ambient:['dust','rays','firefly'], space:true, temple:true },
+    { id:'bg_neonpagoda', name:'Neon Pagoda', rarity:'legendary', price:9400,
+      grad:'radial-gradient(70% 50% at 50% 0%, rgba(255,60,180,0.24), transparent 70%), radial-gradient(50% 40% at 20% 90%, rgba(60,240,255,0.2), transparent 70%), radial-gradient(30% 30% at 85% 20%, rgba(255,240,90,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(8,4,20,0.92)'],[0.5,'rgba(18,8,40,0.62)'],[1,'rgba(3,2,9,0.92)']],
+      ambient:['neonrain','hologram','spark'], cyber:true, temple:true },
+    { id:'bg_infernaldragonlair', name:'Infernal Dragon Lair', rarity:'mythic', price:37000,
+      grad:'radial-gradient(70% 60% at 50% 10%, rgba(255,70,30,0.28), transparent 70%), radial-gradient(50% 40% at 80% 100%, rgba(255,160,60,0.18), transparent 70%), radial-gradient(30% 30% at 15% 80%, rgba(120,10,10,0.14), transparent 70%)',
+      sceneWash:[[0,'rgba(20,4,4,0.92)'],[0.5,'rgba(48,10,8,0.6)'],[1,'rgba(6,2,2,0.92)']],
+      ambient:['ember','fog','firefly'], dragon:true, volcano:true },
+    { id:'bg_celestialforge', name:'Celestial Forge', rarity:'mythic', price:41500,
+      grad:'radial-gradient(70% 60% at 50% 0%, rgba(255,225,160,0.3), transparent 70%), radial-gradient(50% 40% at 80% 100%, rgba(255,255,255,0.18), transparent 70%), radial-gradient(30% 30% at 15% 80%, rgba(200,180,255,0.1), transparent 70%)',
+      sceneWash:[[0,'rgba(22,16,4,0.86)'],[0.5,'rgba(46,32,6,0.5)'],[1,'rgba(8,5,2,0.85)']],
+      ambient:['rays','dust','candle'], space:true, goldenpalace:true },
+    { id:'bg_shatteredmirror', name:'Shattered Mirror Realm', rarity:'mythic', price:44000,
+      grad:'radial-gradient(70% 55% at 50% 0%, rgba(120,220,255,0.26), transparent 70%), radial-gradient(50% 40% at 80% 90%, rgba(255,90,220,0.2), transparent 70%), radial-gradient(30% 25% at 15% 20%, rgba(255,255,255,0.14), transparent 70%)',
+      sceneWash:[[0,'rgba(4,6,16,0.92)'],[0.5,'rgba(10,14,34,0.65)'],[1,'rgba(2,2,8,0.92)']],
+      ambient:['hologram','spark','dust'], cyber:true, space:true },
+    { id:'bg_godsthrone', name:'Throne of the Gods', rarity:'ultimate', price:112000,
+      grad:'radial-gradient(70% 60% at 50% 0%, rgba(255,220,140,0.34), transparent 70%), radial-gradient(50% 40% at 80% 100%, rgba(255,150,70,0.2), transparent 70%), radial-gradient(30% 30% at 15% 80%, rgba(255,80,60,0.14), transparent 70%)',
+      sceneWash:[[0,'rgba(24,14,4,0.85)'],[0.5,'rgba(50,28,6,0.5)'],[1,'rgba(8,5,2,0.85)']],
+      ambient:['candle','rays','ember'], goldenpalace:true, dragon:true },
+    { id:'bg_omegacybercore', name:'Omega Cybercore', rarity:'ultimate', price:130000,
+      grad:'radial-gradient(70% 55% at 50% 0%, rgba(90,255,230,0.3), transparent 70%), radial-gradient(50% 40% at 20% 90%, rgba(255,50,190,0.2), transparent 70%), radial-gradient(30% 25% at 85% 20%, rgba(180,230,255,0.14), transparent 70%)',
+      sceneWash:[[0,'rgba(3,14,18,0.92)'],[0.5,'rgba(7,26,32,0.62)'],[1,'rgba(1,5,8,0.92)']],
+      ambient:['neonrain','snow','spark','hologram'], cyber:true, ice:true },
   ];
   const ACHIEVEMENTS = [
     { id:'first_slice', name:'First Blood', desc:'Slice your first fruit', icon:'🍉', check:s=>s.totalSliced>=1 },
@@ -1975,6 +2272,119 @@
       ctx2.beginPath(); ctx2.ellipse(s*0.36,s*0.3,s*0.18,s*0.09,-0.5,0,Math.PI*2); ctx2.fill();
     });
   }
+  function texBanana(){
+    return makeCanvasTex('banana',(ctx2,s)=>{
+      const g = ctx2.createRadialGradient(s*0.4,s*0.35,s*0.05,s*0.5,s*0.5,s*0.6);
+      g.addColorStop(0,'#fff6b0'); g.addColorStop(0.6,'#ffe066'); g.addColorStop(1,'#d9a800');
+      ctx2.fillStyle=g; ctx2.fillRect(0,0,s,s);
+      ctx2.strokeStyle='rgba(120,90,10,0.35)'; ctx2.lineWidth=s*0.015;
+      for(let i=0;i<3;i++){
+        ctx2.beginPath(); ctx2.moveTo(s*0.5,0); ctx2.quadraticCurveTo(s*(0.5+i*0.05-0.05), s*0.5, s*0.5, s); ctx2.stroke();
+      }
+      ctx2.fillStyle='rgba(80,50,0,0.5)';
+      ctx2.beginPath(); ctx2.arc(s*0.5,s*0.08,s*0.05,0,Math.PI*2); ctx2.fill();
+      ctx2.fillStyle='rgba(255,255,255,0.28)';
+      ctx2.beginPath(); ctx2.ellipse(s*0.36,s*0.3,s*0.16,s*0.08,-0.5,0,Math.PI*2); ctx2.fill();
+    });
+  }
+  function texKiwi(){
+    return makeCanvasTex('kiwi',(ctx2,s)=>{
+      const g = ctx2.createRadialGradient(s*0.5,s*0.5,s*0.02,s*0.5,s*0.5,s*0.58);
+      g.addColorStop(0,'#c8e86a'); g.addColorStop(0.55,'#8fbf3d'); g.addColorStop(1,'#3d6b1a');
+      ctx2.fillStyle=g; ctx2.fillRect(0,0,s,s);
+      ctx2.fillStyle='#f2f0d8';
+      ctx2.beginPath(); ctx2.arc(s*0.5,s*0.5,s*0.16,0,Math.PI*2); ctx2.fill();
+      ctx2.fillStyle='rgba(60,40,10,0.85)';
+      for(let i=0;i<14;i++){
+        const a = (i/14)*Math.PI*2;
+        ctx2.beginPath(); ctx2.arc(s*0.5+Math.cos(a)*s*0.115, s*0.5+Math.sin(a)*s*0.115, s*0.012, 0, Math.PI*2); ctx2.fill();
+      }
+      ctx2.fillStyle='rgba(255,255,255,0.18)';
+      ctx2.beginPath(); ctx2.ellipse(s*0.36,s*0.3,s*0.15,s*0.07,-0.5,0,Math.PI*2); ctx2.fill();
+    });
+  }
+  function texStrawberry(){
+    return makeCanvasTex('strawberry',(ctx2,s)=>{
+      const g = ctx2.createRadialGradient(s*0.4,s*0.35,s*0.05,s*0.5,s*0.5,s*0.6);
+      g.addColorStop(0,'#ff8fa3'); g.addColorStop(0.6,'#ff2d55'); g.addColorStop(1,'#9c0f2e');
+      ctx2.fillStyle=g; ctx2.fillRect(0,0,s,s);
+      ctx2.fillStyle='rgba(255,240,120,0.85)';
+      for(let i=0;i<26;i++){
+        const a = Math.random()*Math.PI*2, r = Math.random()*s*0.42;
+        ctx2.beginPath(); ctx2.ellipse(s*0.5+Math.cos(a)*r, s*0.5+Math.sin(a)*r, s*0.012, s*0.02, a, 0, Math.PI*2); ctx2.fill();
+      }
+      ctx2.fillStyle='rgba(255,255,255,0.3)';
+      ctx2.beginPath(); ctx2.ellipse(s*0.36,s*0.3,s*0.14,s*0.07,-0.5,0,Math.PI*2); ctx2.fill();
+    });
+  }
+  function texMango(){
+    return makeCanvasTex('mango',(ctx2,s)=>{
+      const g = ctx2.createRadialGradient(s*0.4,s*0.35,s*0.05,s*0.5,s*0.5,s*0.6);
+      g.addColorStop(0,'#ffd76a'); g.addColorStop(0.55,'#ff9a2b'); g.addColorStop(1,'#c9401f');
+      ctx2.fillStyle=g; ctx2.fillRect(0,0,s,s);
+      ctx2.fillStyle='rgba(255,60,60,0.18)';
+      ctx2.beginPath(); ctx2.ellipse(s*0.65,s*0.6,s*0.28,s*0.34,0.4,0,Math.PI*2); ctx2.fill();
+      ctx2.fillStyle='rgba(255,255,255,0.26)';
+      ctx2.beginPath(); ctx2.ellipse(s*0.36,s*0.3,s*0.16,s*0.08,-0.5,0,Math.PI*2); ctx2.fill();
+    });
+  }
+  function texCoconut(){
+    return makeCanvasTex('coconut',(ctx2,s)=>{
+      const g = ctx2.createRadialGradient(s*0.4,s*0.35,s*0.05,s*0.5,s*0.5,s*0.6);
+      g.addColorStop(0,'#8a6a4a'); g.addColorStop(0.6,'#5c4128'); g.addColorStop(1,'#2b1c10');
+      ctx2.fillStyle=g; ctx2.fillRect(0,0,s,s);
+      ctx2.fillStyle='rgba(240,230,210,0.9)';
+      ctx2.beginPath(); ctx2.arc(s*0.5,s*0.5,s*0.15,0,Math.PI*2); ctx2.fill();
+      ctx2.strokeStyle='rgba(40,26,12,0.5)'; ctx2.lineWidth=s*0.012;
+      for(let i=0;i<10;i++){
+        ctx2.beginPath(); ctx2.arc(Math.random()*s, Math.random()*s, s*0.05+Math.random()*s*0.05, 0, Math.PI*2); ctx2.stroke();
+      }
+      ctx2.fillStyle='rgba(255,255,255,0.14)';
+      ctx2.beginPath(); ctx2.ellipse(s*0.36,s*0.3,s*0.14,s*0.07,-0.5,0,Math.PI*2); ctx2.fill();
+    });
+  }
+  function texPeach(){
+    return makeCanvasTex('peach',(ctx2,s)=>{
+      const g = ctx2.createRadialGradient(s*0.4,s*0.35,s*0.05,s*0.5,s*0.5,s*0.6);
+      g.addColorStop(0,'#ffe0c2'); g.addColorStop(0.55,'#ffb27a'); g.addColorStop(1,'#e0602f');
+      ctx2.fillStyle=g; ctx2.fillRect(0,0,s,s);
+      ctx2.strokeStyle='rgba(200,60,60,0.3)'; ctx2.lineWidth=s*0.014;
+      ctx2.beginPath(); ctx2.moveTo(s*0.5,s*0.08); ctx2.lineTo(s*0.5,s*0.92); ctx2.stroke();
+      ctx2.fillStyle='rgba(255,255,255,0.3)';
+      ctx2.beginPath(); ctx2.ellipse(s*0.36,s*0.3,s*0.16,s*0.08,-0.5,0,Math.PI*2); ctx2.fill();
+    });
+  }
+  function texBlueberry(){
+    return makeCanvasTex('blueberry',(ctx2,s)=>{
+      const g = ctx2.createRadialGradient(s*0.4,s*0.35,s*0.05,s*0.5,s*0.5,s*0.55);
+      g.addColorStop(0,'#8fa0ff'); g.addColorStop(0.6,'#3d4dbf'); g.addColorStop(1,'#1a1f6b');
+      ctx2.fillStyle=g; ctx2.fillRect(0,0,s,s);
+      ctx2.strokeStyle='rgba(20,20,60,0.6)'; ctx2.lineWidth=s*0.02;
+      ctx2.beginPath();
+      for(let i=0;i<5;i++){
+        const a=(i/5)*Math.PI*2;
+        ctx2.moveTo(s*0.5+Math.cos(a)*s*0.06, s*0.5+Math.sin(a)*s*0.06);
+        ctx2.lineTo(s*0.5+Math.cos(a)*s*0.11, s*0.5+Math.sin(a)*s*0.11);
+      }
+      ctx2.stroke();
+      ctx2.fillStyle='rgba(255,255,255,0.24)';
+      ctx2.beginPath(); ctx2.ellipse(s*0.36,s*0.3,s*0.14,s*0.07,-0.5,0,Math.PI*2); ctx2.fill();
+    });
+  }
+  function texDragonfruit(){
+    return makeCanvasTex('dragonfruit',(ctx2,s)=>{
+      const g = ctx2.createRadialGradient(s*0.4,s*0.35,s*0.05,s*0.5,s*0.5,s*0.6);
+      g.addColorStop(0,'#ff8fd6'); g.addColorStop(0.55,'#ff2b9e'); g.addColorStop(1,'#8a1060');
+      ctx2.fillStyle=g; ctx2.fillRect(0,0,s,s);
+      ctx2.fillStyle='rgba(120,255,140,0.55)';
+      for(let i=0;i<6;i++){
+        const a=(i/6)*Math.PI*2;
+        ctx2.beginPath(); ctx2.ellipse(s*0.5+Math.cos(a)*s*0.4, s*0.5+Math.sin(a)*s*0.4, s*0.05, s*0.09, a, 0, Math.PI*2); ctx2.fill();
+      }
+      ctx2.fillStyle='rgba(255,255,255,0.3)';
+      ctx2.beginPath(); ctx2.ellipse(s*0.36,s*0.3,s*0.15,s*0.07,-0.5,0,Math.PI*2); ctx2.fill();
+    });
+  }
   function texBomb(){
     return makeCanvasTex('bomb',(ctx2,s)=>{
       const g = ctx2.createRadialGradient(s*0.4,s*0.35,s*0.02,s*0.5,s*0.5,s*0.6);
@@ -1984,6 +2394,63 @@
       ctx2.beginPath(); ctx2.ellipse(s*0.38,s*0.3,s*0.14,s*0.07,-0.5,0,Math.PI*2); ctx2.fill();
       ctx2.strokeStyle='rgba(255,60,60,0.4)'; ctx2.lineWidth=s*0.01;
       ctx2.beginPath(); ctx2.arc(s*0.5,s*0.5,s*0.42,0,Math.PI*2); ctx2.stroke();
+    });
+  }
+  function texSpikeBomb(){
+    return makeCanvasTex('spikebomb',(ctx2,s)=>{
+      const g = ctx2.createRadialGradient(s*0.4,s*0.35,s*0.02,s*0.5,s*0.5,s*0.6);
+      g.addColorStop(0,'#4a2d2d'); g.addColorStop(1,'#140a0a');
+      ctx2.fillStyle=g; ctx2.fillRect(0,0,s,s);
+      ctx2.strokeStyle='rgba(255,90,60,0.8)'; ctx2.lineWidth=s*0.025;
+      for(let i=0;i<10;i++){
+        const a=(i/10)*Math.PI*2;
+        ctx2.beginPath();
+        ctx2.moveTo(s*0.5+Math.cos(a)*s*0.3, s*0.5+Math.sin(a)*s*0.3);
+        ctx2.lineTo(s*0.5+Math.cos(a)*s*0.47, s*0.5+Math.sin(a)*s*0.47);
+        ctx2.stroke();
+      }
+      ctx2.fillStyle='rgba(255,255,255,0.15)';
+      ctx2.beginPath(); ctx2.ellipse(s*0.38,s*0.3,s*0.12,s*0.06,-0.5,0,Math.PI*2); ctx2.fill();
+    });
+  }
+  function texMegaBomb(){
+    return makeCanvasTex('megabomb',(ctx2,s)=>{
+      const g = ctx2.createRadialGradient(s*0.4,s*0.35,s*0.02,s*0.5,s*0.5,s*0.6);
+      g.addColorStop(0,'#5c1616'); g.addColorStop(1,'#0c0303');
+      ctx2.fillStyle=g; ctx2.fillRect(0,0,s,s);
+      ctx2.strokeStyle='rgba(255,180,40,0.85)'; ctx2.lineWidth=s*0.018;
+      ctx2.beginPath(); ctx2.arc(s*0.5,s*0.5,s*0.3,0,Math.PI*2); ctx2.stroke();
+      ctx2.beginPath(); ctx2.arc(s*0.5,s*0.5,s*0.42,0,Math.PI*2); ctx2.stroke();
+      ctx2.fillStyle='rgba(255,220,60,0.9)'; ctx2.font='bold '+(s*0.3)+'px sans-serif'; ctx2.textAlign='center'; ctx2.textBaseline='middle';
+      ctx2.fillText('!', s*0.5, s*0.52);
+      ctx2.fillStyle='rgba(255,255,255,0.16)';
+      ctx2.beginPath(); ctx2.ellipse(s*0.38,s*0.3,s*0.14,s*0.07,-0.5,0,Math.PI*2); ctx2.fill();
+    });
+  }
+  function texSmokeBomb(){
+    return makeCanvasTex('smokebomb',(ctx2,s)=>{
+      const g = ctx2.createRadialGradient(s*0.4,s*0.35,s*0.02,s*0.5,s*0.5,s*0.6);
+      g.addColorStop(0,'#7a7a86'); g.addColorStop(0.6,'#45454f'); g.addColorStop(1,'#18181e');
+      ctx2.fillStyle=g; ctx2.fillRect(0,0,s,s);
+      ctx2.fillStyle='rgba(220,220,230,0.25)';
+      for(let i=0;i<8;i++){
+        ctx2.beginPath(); ctx2.arc(Math.random()*s, Math.random()*s, s*0.06+Math.random()*s*0.08, 0, Math.PI*2); ctx2.fill();
+      }
+      ctx2.fillStyle='rgba(255,255,255,0.14)';
+      ctx2.beginPath(); ctx2.ellipse(s*0.38,s*0.3,s*0.13,s*0.06,-0.5,0,Math.PI*2); ctx2.fill();
+    });
+  }
+  function texFrostBombVariant(){
+    return makeCanvasTex('frostbombvariant',(ctx2,s)=>{
+      const g = ctx2.createRadialGradient(s*0.4,s*0.35,s*0.02,s*0.5,s*0.5,s*0.6);
+      g.addColorStop(0,'#284a5c'); g.addColorStop(1,'#081218');
+      ctx2.fillStyle=g; ctx2.fillRect(0,0,s,s);
+      ctx2.strokeStyle='rgba(140,230,255,0.7)'; ctx2.lineWidth=s*0.012;
+      for(let i=0;i<6;i++){
+        ctx2.beginPath(); ctx2.moveTo(s*0.5,s*0.5); ctx2.lineTo(s*0.5+Math.cos(i)*s*0.4, s*0.5+Math.sin(i)*s*0.4); ctx2.stroke();
+      }
+      ctx2.fillStyle='rgba(255,255,255,0.18)';
+      ctx2.beginPath(); ctx2.ellipse(s*0.38,s*0.3,s*0.12,s*0.06,-0.5,0,Math.PI*2); ctx2.fill();
     });
   }
   function texFrost(){
@@ -2022,11 +2489,36 @@
     { name:'apple',      peel:0xe63946, flesh:0xfff3d6, radius:0.6,  points:10, tex:texApple },
     { name:'lemon',      peel:0xffd23f, flesh:0xfff6c8, radius:0.55, points:15, tex:texLemon },
     { name:'grape',      peel:0x4c4cff, flesh:0xc9c9ff, radius:0.5,  points:15, tex:texGrape },
+    { name:'banana',     peel:0xffe066, flesh:0xfff6c8, radius:0.58, points:12, tex:texBanana },
+    { name:'kiwi',       peel:0x8fbf3d, flesh:0xd8f2a0, radius:0.5,  points:15, tex:texKiwi },
+    { name:'strawberry', peel:0xff2d55, flesh:0xffd6de, radius:0.48, points:18, tex:texStrawberry },
+    { name:'mango',      peel:0xff9a2b, flesh:0xffe0a0, radius:0.68, points:12, tex:texMango },
+    { name:'coconut',    peel:0x5c4128, flesh:0xf5f0e0, radius:0.72, points:14, tex:texCoconut },
+    { name:'peach',      peel:0xffb27a, flesh:0xfff0dc, radius:0.6,  points:12, tex:texPeach },
+    { name:'blueberry',  peel:0x3d4dbf, flesh:0xd6dcff, radius:0.42, points:20, tex:texBlueberry },
+    { name:'dragonfruit',peel:0xff2b9e, flesh:0xfff0fa, radius:0.7,  points:16, tex:texDragonfruit },
   ];
   const BOSS_FRUIT = { name:'pineapple', peel:0xd99a10, flesh:0xfff3a0, radius:1.35, points:80, tex:texPineapple, isBoss:true, hp:3 };
   const GOLDEN_FRUIT = { name:'golden', peel:0xffd23f, flesh:0xfff6c8, radius:0.62, points:60, tex:texGold, isGolden:true, coinBonus:40 };
   const LUCKY_FRUIT = { name:'lucky', peel:0x4c4cff, flesh:0xffffff, radius:0.58, points:25, tex:texGrape, isLucky:true, coinBonus:18 };
-  const BOMB = { name:'bomb', peel:0x17181c, radius:0.7, tex:texBomb };
+  // Bomb variety: each bomb type looks and explodes a little differently, but all
+  // cost the player a life when sliced. weight controls how often it's picked
+  // relative to the others (higher = more common); livesCost lets rarer bombs
+  // (like the mega bomb) hurt more.
+  const BOMB_TYPES = [
+    { name:'bomb',       label:'Classic Bomb', peel:0x17181c, radius:0.7,  tex:texBomb,            isBomb:true, explosionColor:0xff6a3b, weight:5, livesCost:1 },
+    { name:'spikebomb',  label:'Spike Bomb',   peel:0x2b1414, radius:0.72, tex:texSpikeBomb,        isBomb:true, explosionColor:0xff5c3b, weight:3, livesCost:1 },
+    { name:'smokebomb',  label:'Smoke Bomb',   peel:0x3a3a42, radius:0.68, tex:texSmokeBomb,        isBomb:true, explosionColor:0xaaaaaa, weight:2, livesCost:1 },
+    { name:'frostbomb',  label:'Frost Bomb',   peel:0x102834, radius:0.68, tex:texFrostBombVariant, isBomb:true, explosionColor:0x8fe0ff, weight:2, livesCost:1 },
+    { name:'megabomb',   label:'Mega Bomb',    peel:0x2b0a0a, radius:0.95, tex:texMegaBomb,         isBomb:true, explosionColor:0xffcb47, weight:1, livesCost:2 },
+  ];
+  const BOMB_WEIGHT_TOTAL = BOMB_TYPES.reduce((a,b)=>a+b.weight,0);
+  function pickBombType(){
+    let roll = Math.random()*BOMB_WEIGHT_TOTAL;
+    for(const b of BOMB_TYPES){ roll -= b.weight; if(roll<=0) return b; }
+    return BOMB_TYPES[0];
+  }
+  const BOMB = BOMB_TYPES[0]; // kept for any legacy reference
   const POWERUPS = [
     { name:'freeze',  radius:0.55, tex:texFrost,  effect:'freeze' },
     { name:'double',  radius:0.55, tex:texClock,  effect:'double' },
@@ -2045,12 +2537,12 @@
      GAME STATE
   ========================================================================= */
   let state = 'idle'; // idle | playing | paused | over
-  let currentMode = 'classic'; // classic | arcade | zen | survival | hardcore
+  let currentMode = 'classic'; // classic | arcade | zen | survival | hardcore | bossrush | blitz | chaos | precision | gauntlet
   const ARCADE_DURATION = 60; // seconds
-  const MODE_DURATIONS = { arcade: ARCADE_DURATION, zen: 90, blitz: 30 }; // modes that run on a countdown
+  const MODE_DURATIONS = { arcade: ARCADE_DURATION, zen: 90, blitz: 30, gauntlet: 45 }; // modes that run on a countdown
   const BONUS_FRUIT = { name:'bonus', peel:0xffcb47, flesh:0xfff6c8, radius:1.55, points:500, tex:texGold, isGolden:true, coinBonus:250 };
   let modeTimeLeft = 0, arcadeFinaleSpawned = false, arcadeFinaleTimer = 0;
-  function maxLivesForMode(){ return currentMode==='hardcore' ? 1 : (currentMode==='chaos' ? 2 : 3); }
+  function maxLivesForMode(){ return (currentMode==='hardcore'||currentMode==='precision') ? 1 : ((currentMode==='chaos'||currentMode==='gauntlet') ? 2 : 3); }
   function survivalOverdrive(){
     // Survival keeps climbing past the normal difficulty cap the longer the run goes.
     if(currentMode!=='survival') return 0;
@@ -2110,6 +2602,8 @@
     if(bossCooldown>0) interval *= 1.7; // brief breather after a boss wave
     if(currentMode==='blitz') interval *= 0.55; // nonstop chaos for the 30-second sprint
     if(currentMode==='chaos') interval *= 0.75;
+    if(currentMode==='gauntlet') interval *= 0.5; // the densest spawn rate in the dojo
+    if(currentMode==='precision') interval *= 1.35; // calmer pacing rewards clean, deliberate slices
     return Math.max(SPAWN_INTERVAL_MIN, interval);
   }
   function currentBombChance(){
@@ -2119,6 +2613,8 @@
     if(currentMode==='survival') chance += survivalOverdrive()*0.15;
     if(currentMode==='chaos') chance += 0.12; // higher risk, higher reward
     if(currentMode==='bossrush') chance *= 0.6; // the bosses are the threat here, not a bomb minefield
+    if(currentMode==='gauntlet') chance += 0.16; // dense spawns bring dense danger too
+    if(currentMode==='precision') chance *= 0.7; // fewer bombs, but only one mistake allowed
     return Math.min(0.55, chance);
   }
   function choosePattern(){
@@ -2154,8 +2650,8 @@
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.castShadow = true;
-    if(def.name==='bomb'){
-      mat.roughness = 0.55; mat.emissive = new THREE.Color(0xff3b3b); mat.emissiveIntensity = 0.3;
+    if(def.isBomb){
+      mat.roughness = 0.55; mat.emissive = new THREE.Color(def.explosionColor||0xff3b3b); mat.emissiveIntensity = 0.3;
       const fuseGeo = new THREE.SphereGeometry(0.12, 8, 8);
       const fuseMat = new THREE.MeshBasicMaterial({ color:0xff3b3b });
       const fuse = new THREE.Mesh(fuseGeo, fuseMat);
@@ -2196,7 +2692,7 @@
       const goldenChance = 0.03;
       const luckyChance = 0.04;
       const roll = Math.random();
-      if(roll < bombChance) def = BOMB;
+      if(roll < bombChance) def = pickBombType();
       else if(roll < bombChance+goldenChance) def = GOLDEN_FRUIT;
       else if(roll < bombChance+goldenChance+luckyChance) def = LUCKY_FRUIT;
       else def = FRUIT_TYPES[Math.floor(Math.random()*FRUIT_TYPES.length)];
@@ -2215,7 +2711,7 @@
     // rotation speed increases slightly with difficulty
     const spinScale = 1 + diff*0.85;
     const spin = new THREE.Vector3((Math.random()-0.5)*4*spinScale,(Math.random()-0.5)*4*spinScale,(Math.random()-0.5)*4*spinScale);
-    activeFruits.push({ mesh, def, isBomb:def.name==='bomb', isPowerup:!!def.isPowerup, isBoss:!!def.isBoss,
+    activeFruits.push({ mesh, def, isBomb:!!def.isBomb, isPowerup:!!def.isPowerup, isBoss:!!def.isBoss,
       hp:def.hp||1, maxHp:def.hp||1, pos:mesh.position, vel:new THREE.Vector3(vx,vy,0), spin, sliced:false, r:def.radius,
       spawnT:performance.now(), wobblePhase:Math.random()*Math.PI*2 });
   }
@@ -2402,13 +2898,16 @@
     flashes.push({ x:s.x, y:s.y, age:0, big:!!big });
   }
 
+  function hexToRgb(hex){
+    const h = hex.replace('#','');
+    return { r:parseInt(h.substr(0,2),16), g:parseInt(h.substr(2,2),16), b:parseInt(h.substr(4,2),16) };
+  }
   function equippedKnifeColor(){
     const k = KNIVES.find(x=>x.id===Save.d.equippedKnife) || KNIVES[0];
     return k.trailHint;
   }
-  function equippedTrailColor(){
-    const t = TRAILS.find(x=>x.id===Save.d.equippedTrail) || TRAILS[0];
-    return t.color;
+  function equippedTrail(){
+    return TRAILS.find(x=>x.id===Save.d.equippedTrail) || TRAILS[0];
   }
 
   function spawnJuiceBurst(pos, color, count, boss){
@@ -2583,7 +3082,7 @@
     }
     const fleshColor = f.def.flesh || 0xffffff;
     const isCritical = hitSpeed > 26;
-    spawnJuiceBurst(f.pos, f.isBomb?0xff6a3b:fleshColor, f.isBomb?16:(isCritical?14:9), f.isBoss);
+    spawnJuiceBurst(f.pos, f.isBomb?(f.def.explosionColor||0xff6a3b):fleshColor, f.isBomb?16:(isCritical?14:9), f.isBoss);
     spawnSlashFlash(f.pos, isCritical);
     if(!f.isBomb){
       // combo streaks and criticals produce bigger, more dramatic splashes
@@ -2594,14 +3093,18 @@
     }
 
     if(f.isBomb){
+      const livesCost = f.def.livesCost || 1;
+      const c = new THREE.Color(f.def.explosionColor||0xff6e3c);
+      const flashRgb = Math.round(c.r*255)+','+Math.round(c.g*255)+','+Math.round(c.b*255);
       Audio.SFX.explosion();
-      shakeCamera(0.55, 0.4);
-      flashWhite(0.4, '255,110,60');
+      shakeCamera(livesCost>1 ? 0.85 : 0.55, livesCost>1 ? 0.55 : 0.4);
+      flashWhite(livesCost>1 ? 0.55 : 0.4, flashRgb);
       spawnShockwave(f.pos);
-      spawnJuiceBurst(f.pos, 0x2a2a2a, 10, false); // extra dark shrapnel on top of the fire-colored burst above
+      spawnJuiceBurst(f.pos, 0x2a2a2a, livesCost>1 ? 16 : 10, false); // extra dark shrapnel on top of the fire-colored burst above
       Save.d.stats.totalBombsHit++; bombHitRun = true; Save.save();
       combo = 0; comboEl.style.opacity = 0;
-      loseLife('Sliced a bomb'); // costs one life instead of ending the run outright
+      const reasonLabel = f.def.label ? ('Sliced a '+f.def.label) : 'Sliced a bomb';
+      for(let i=0;i<livesCost;i++){ loseLife(reasonLabel); if(lives<=0) break; } // bigger bombs cost more lives instead of ending the run outright
       return;
     }
 
@@ -2623,6 +3126,8 @@
     if(currentMode==='hardcore' && coinGain>0) coinGain = Math.round(coinGain*1.5);
     if(currentMode==='chaos' && coinGain>0) coinGain = Math.round(coinGain*1.75);
     if(currentMode==='blitz' && coinGain>0) coinGain = Math.round(coinGain*1.3);
+    if(currentMode==='gauntlet' && coinGain>0) coinGain = Math.round(coinGain*1.4);
+    if(currentMode==='precision' && coinGain>0) coinGain = Math.round(coinGain*2);
     if(magnetTimer>0) coinGain = Math.max(coinGain, 2);
     let gemGain = 0;
     if(f.isBoss){
@@ -2643,7 +3148,7 @@
     if([5,10,15,20,25,30,40,50].includes(combo)){
       showComboBanner(combo+'x COMBO!');
       Audio.SFX.combo(combo);
-      const frenzyThreshold = (currentMode==='arcade'||currentMode==='blitz') ? 8 : 15;
+      const frenzyThreshold = (currentMode==='arcade'||currentMode==='blitz'||currentMode==='gauntlet') ? 8 : 15;
       if(combo>=frenzyThreshold && !frenzyActive) triggerFrenzy();
     }
     updateMissionProgress('combo', 0); // progress uses max via direct set below
@@ -2848,14 +3353,32 @@
      RENDERING: trail (motion blur), glow (fake bloom), dust, background
   ========================================================================= */
   function trailColorAt(alpha){
-    const c = equippedTrailColor();
-    if(c==='rainbow'){
+    const t = equippedTrail();
+    if(t.color==='rainbow'){
       const hue = (performance.now()/6) % 360;
       return `hsla(${hue},100%,65%,${alpha})`;
     }
-    const hex = c.replace('#','');
-    const r = parseInt(hex.substr(0,2),16), g = parseInt(hex.substr(2,2),16), b = parseInt(hex.substr(4,2),16);
-    return `rgba(${r},${g},${b},${alpha})`;
+    if(t.style==='dual' && t.color2){
+      // Slash trail breathes smoothly between the two tones instead of
+      // sitting on one flat color — a real, live animation while slicing.
+      const k = (Math.sin(performance.now()/450)+1)/2;
+      const c1 = hexToRgb(t.color), c2 = hexToRgb(t.color2);
+      const r = Math.round(c1.r+(c2.r-c1.r)*k);
+      const g = Math.round(c1.g+(c2.g-c1.g)*k);
+      const b = Math.round(c1.b+(c2.b-c1.b)*k);
+      return `rgba(${r},${g},${b},${alpha})`;
+    }
+    if(t.style==='sparkle'){
+      // Fast white glints flicker over the base color for a twinkling blade trail.
+      const glint = Math.sin(performance.now()/55 + trail.length) > 0.75 ? 1 : 0;
+      const base = hexToRgb(t.color);
+      const r = Math.round(base.r+(255-base.r)*glint*0.85);
+      const g = Math.round(base.g+(255-base.g)*glint*0.85);
+      const b = Math.round(base.b+(255-base.b)*glint*0.85);
+      return `rgba(${r},${g},${b},${alpha})`;
+    }
+    const c = hexToRgb(t.color);
+    return `rgba(${c.r},${c.g},${c.b},${alpha})`;
   }
   function drawTrail(){
     const w = window.innerWidth, h = window.innerHeight;
@@ -3338,7 +3861,7 @@
     if(state!=='playing') return;
     state = 'over';
     best = Math.max(best, score);
-    const bestKeys = { arcade:'bestArcadeScore', zen:'bestZenScore', survival:'bestSurvivalScore', hardcore:'bestHardcoreScore', bossrush:'bestBossrushScore', blitz:'bestBlitzScore', chaos:'bestChaosScore' };
+    const bestKeys = { arcade:'bestArcadeScore', zen:'bestZenScore', survival:'bestSurvivalScore', hardcore:'bestHardcoreScore', bossrush:'bestBossrushScore', blitz:'bestBlitzScore', chaos:'bestChaosScore', precision:'bestPrecisionScore', gauntlet:'bestGauntletScore' };
     if(bestKeys[currentMode]){
       Save.d[bestKeys[currentMode]] = Math.max(Save.d[bestKeys[currentMode]]||0, score);
     } else {
@@ -3379,6 +3902,8 @@
       Bossrush: ['modeBestBossrush', Save.d.bestBossrushScore],
       Blitz: ['modeBestBlitz', Save.d.bestBlitzScore],
       Chaos: ['modeBestChaos', Save.d.bestChaosScore],
+      Precision: ['modeBestPrecision', Save.d.bestPrecisionScore],
+      Gauntlet: ['modeBestGauntlet', Save.d.bestGauntletScore],
     };
     Object.values(tagMap).forEach(([id, val])=>{
       const el = document.getElementById(id);
@@ -3483,14 +4008,26 @@
       const equipped = Save.d[equippedKey] === item.id;
       const div = document.createElement('div');
       div.className = 'shopItem' + (equipped?' equipped':'');
-      const swatchColor = item.color!==undefined ? hexStr(item.color) : (item.color==='rainbow'?'linear-gradient(90deg,red,orange,yellow,green,blue,violet)':item.grad? item.grad : item.color);
-      let swatchStyle;
-      if(shopTab==='backgrounds') swatchStyle = 'background:'+item.grad+', #14101f;';
-      else if(item.color==='rainbow') swatchStyle = 'background:conic-gradient(red,orange,yellow,green,blue,violet,red);';
-      else swatchStyle = 'background:'+(shopTab==='trails'?item.color:swatchColor)+';';
+      let swatchBg, animClasses = [];
+      if(shopTab==='backgrounds'){
+        swatchBg = item.grad+', #14101f';
+      } else {
+        const baseColor = typeof item.color==='number' ? hexStr(item.color) : item.color;
+        if(baseColor==='rainbow'){
+          swatchBg = 'conic-gradient(red,orange,yellow,green,blue,violet,red)';
+          animClasses.push('anim-rainbow');
+        } else if(item.style==='dual' && item.color2){
+          swatchBg = 'linear-gradient(135deg, '+baseColor+', '+item.color2+', '+baseColor+')';
+          animClasses.push('anim-dual');
+        } else {
+          swatchBg = baseColor;
+        }
+        if(item.style==='sparkle') animClasses.push('anim-sparkle');
+        if(item.rarity==='epic'||item.rarity==='legendary'||item.rarity==='mythic'||item.rarity==='ultimate') animClasses.push('anim-shine');
+      }
       div.innerHTML = `
         <span class="rarityTag r-${item.rarity}">${item.rarity}</span>
-        <div class="swatch" style="${swatchStyle}"></div>
+        <div class="swatch ${animClasses.join(' ')}" style="background:${swatchBg};"></div>
         <div class="nm">${item.name}</div>
         <div class="price">${owned? (equipped?'Equipped':'Owned') : (item.gemPrice ? '💎 '+item.gemPrice : '🪙 '+item.price)}</div>
       `;
@@ -3575,6 +4112,50 @@
     document.getElementById('nameInput').value = Save.d.playerName==='Guest' ? '' : Save.d.playerName;
     closeOverlay('settingsScreen');
     openOverlay('nameScreen');
+  });
+
+  /* ---- Login / account screen wiring ---- */
+  let authMode = 'login';
+  const authUserInput = document.getElementById('authUserInput');
+  const authPassInput = document.getElementById('authPassInput');
+  const authPassConfirmInput = document.getElementById('authPassConfirmInput');
+  const authError = document.getElementById('authError');
+  const authSubmitBtn = document.getElementById('authSubmitBtn');
+  function setAuthMode(mode){
+    authMode = mode;
+    authError.textContent = '';
+    document.getElementById('authTabLogin').classList.toggle('active', mode==='login');
+    document.getElementById('authTabRegister').classList.toggle('active', mode==='register');
+    authPassConfirmInput.classList.toggle('hidden', mode==='login');
+    authSubmitBtn.textContent = mode==='login' ? 'Login' : 'Create Account';
+  }
+  document.getElementById('authTabLogin').addEventListener('click', ()=>{ Audio.SFX.click(); setAuthMode('login'); });
+  document.getElementById('authTabRegister').addEventListener('click', ()=>{ Audio.SFX.click(); setAuthMode('register'); });
+  async function submitAuth(){
+    authError.textContent = '';
+    authSubmitBtn.disabled = true;
+    const username = authUserInput.value, password = authPassInput.value;
+    const result = authMode==='login'
+      ? await Auth.login(username, password)
+      : await Auth.register(username, password, authPassConfirmInput.value);
+    authSubmitBtn.disabled = false;
+    if(!result.ok){ authError.textContent = result.error; return; }
+    // Reload so every module re-initializes cleanly against this account's save slot.
+    location.reload();
+  }
+  authSubmitBtn.addEventListener('click', ()=>{ Audio.SFX.click(); submitAuth(); });
+  [authUserInput, authPassInput, authPassConfirmInput].forEach(el=>{
+    el.addEventListener('keydown', (e)=>{ if(e.key==='Enter') submitAuth(); });
+  });
+  document.getElementById('authGuestBtn').addEventListener('click', ()=>{
+    Audio.SFX.click();
+    Auth.continueAsGuest();
+    location.reload();
+  });
+  document.getElementById('logoutBtn').addEventListener('click', ()=>{
+    Audio.SFX.click();
+    Auth.logout();
+    location.reload();
   });
 
   /* =========================================================================
@@ -4047,6 +4628,7 @@
     sfxSlider.value = Save.d.settings.sfx;
     document.getElementById('shakeToggle').classList.toggle('on', Save.d.settings.shake);
     document.getElementById('blurToggle').classList.toggle('on', Save.d.settings.blur);
+    document.getElementById('acctLabel').textContent = Auth.isLoggedIn() ? ('Signed in as '+Auth.currentUser()) : 'Playing as Guest';
   }
   sensSlider.addEventListener('input', ()=>{ Save.d.settings.sensitivity = parseFloat(sensSlider.value); Save.save(); });
   musicSlider.addEventListener('input', ()=>{ Audio.setMusicVol(parseFloat(musicSlider.value)); Save.save(); });
@@ -4554,6 +5136,10 @@
   tick();
 
   function finalBoot(){
+    if(!Auth.currentUser()){
+      openOverlay('loginScreen');
+      return;
+    }
     if(Save.d.playerName){
       refreshNameDisplays();
       openOverlay('startScreen');
