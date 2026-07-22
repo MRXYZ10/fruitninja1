@@ -1411,6 +1411,7 @@
         <div class="settingRow"><label>Account</label><span id="acctLabel" style="font-size:11px; color:var(--text-dim);"></span></div>
         <div class="settingRow"><label>&nbsp;</label><button class="btn secondary small" id="logoutBtn" style="padding:8px 16px;">🚪 Logout</button></div>
         <div class="settingRow"><label>Invite Friends</label><button class="btn secondary small" id="inviteBtnSettings" style="padding:8px 16px;">🎁 Invite</button></div>
+        <div class="settingRow"><label>Quality</label><button class="btn secondary small" id="qualityBtn" style="padding:8px 16px; min-width:104px;">Auto</button></div>
         <div class="settingRow"><label>Camera Sensitivity</label><input type="range" id="sensSlider" min="0.5" max="2" step="0.05" value="1"></div>
         <div class="settingRow"><label>Music Volume</label><input type="range" id="musicSlider" min="0" max="1" step="0.05" value="0.5"></div>
         <div class="settingRow"><label>SFX Volume</label><input type="range" id="sfxSlider" min="0" max="1" step="0.05" value="0.8"></div>
@@ -1597,7 +1598,7 @@
       referralCode:'', referredBy:'', referralUsed:false, referralInvites:0, referralCoinsEarned:0, referralHistory:[],
       equippedKnife:'k_basic', equippedTrail:'t_lime', equippedBg:'bg_dojo',
       unlockedKnives:['k_basic'], unlockedTrails:['t_lime'], unlockedBg:['bg_dojo'],
-      settings:{ sensitivity:1, music:0.5, sfx:0.8, shake:true, blur:true, reduceMotion:false, highContrast:false },
+      settings:{ sensitivity:1, music:0.5, sfx:0.8, shake:true, blur:true, reduceMotion:false, highContrast:false, quality:'auto' },
       stats:{ gamesPlayed:0, totalSliced:0, totalBombsHit:0, bestCombo:0, totalCoinsEarned:0, totalGemsEarned:0, totalPowerups:0, bossesDefeated:0 },
       achievements:{}, // id -> true
       missions:{ date:'', list:[] },
@@ -1627,16 +1628,26 @@
      without touching any gameplay logic.
   ========================================================================= */
   const Perf = (function(){
+    // Quality tiers, low → high. `level` (0..4) drives every scaling knob in
+    // the renderer (dpr cap, particle counts, shadows, blur/glow, background
+    // update rate). "Auto" continuously re-measures rolling FPS and nudges
+    // level up/down; picking a tier by hand in Settings pins it and turns
+    // auto-adjust off.
+    const TIERS = ['potato','low','medium','high','ultra'];
     const SAMPLE = 30;
     const frameTimes = [];
-    let level = 0;          // 0 high, 1 medium, 2 low
+    let level = 3;          // start at 'high'; device heuristic below may lower it
+    let manual = false;     // true once the player picks a tier explicitly
     let lastBump = 0;
     let stutterStreak = 0;  // consecutive hard-drop frames, for a fast-track downgrade
     // Cheap upfront device heuristic so we don't start maxed-out on weak hardware.
     const cores = navigator.hardwareConcurrency || 4;
+    const mem = navigator.deviceMemory || 4; // GB, when the browser exposes it
     const isCoarsePointer = window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
-    if(cores <= 4 && isCoarsePointer) level = 1;
+    if(isCoarsePointer && (cores <= 4 || mem <= 3)) level = 2;      // medium: weaker phone
+    if(isCoarsePointer && (cores <= 2 || mem <= 2)) level = 0;      // potato: very weak phone
     function sample(dt){
+      if(manual) return; // player pinned a tier — don't fight their choice
       const fps = dt>0 ? 1/dt : 60;
       frameTimes.push(fps);
       if(frameTimes.length > SAMPLE) frameTimes.shift();
@@ -1646,29 +1657,38 @@
       // drop quality immediately so the game recovers smoothly instead of
       // chugging while it "waits and sees".
       if(fps < 28){ stutterStreak++; } else { stutterStreak = 0; }
-      if(stutterStreak >= 8 && level < 2 && now - lastBump > 400){
-        level++; lastBump = now; stutterStreak = 0; applyLevel(); return;
+      if(stutterStreak >= 8 && level > 0 && now - lastBump > 400){
+        level--; lastBump = now; stutterStreak = 0; applyLevel(); return;
       }
       if(frameTimes.length < SAMPLE) return;
       if(now - lastBump < 1200) return; // re-evaluate at most every 1.2s to avoid flapping
       const avg = frameTimes.reduce((a,b)=>a+b,0) / frameTimes.length;
-      if(avg < 45 && level < 2){ level++; lastBump = now; applyLevel(); }
-      else if(avg > 57 && level > 0){ level--; lastBump = now; applyLevel(); }
+      if(avg < 45 && level > 0){ level--; lastBump = now; applyLevel(); }
+      else if(avg > 57 && level < 4){ level++; lastBump = now; applyLevel(); }
     }
     function applyLevel(){
       const dpr = window.devicePixelRatio || 1;
-      const cap = level===0 ? Math.min(dpr,2) : level===1 ? Math.min(dpr,1.5) : 1;
+      const cap = level>=4 ? Math.min(dpr,2) : level===3 ? Math.min(dpr,2) : level===2 ? Math.min(dpr,1.5) : level===1 ? 1 : Math.min(dpr,0.85);
       renderer.setPixelRatio(cap);
-      renderer.shadowMap.enabled = level < 2;
+      renderer.shadowMap.enabled = level >= 2;
       initDust();
       initAmbient(currentBg());
     }
+    function setTier(name){
+      const idx = TIERS.indexOf(name);
+      if(name==='auto'){ manual = false; return; }
+      if(idx<0) return;
+      manual = true; level = idx; frameTimes.length = 0; stutterStreak = 0;
+      applyLevel();
+    }
     return {
-      sample,
-      get level(){ return level; },
-      particleScale(){ const base = level===0 ? 1 : level===1 ? 0.55 : 0.25; return Save.d.settings.reduceMotion ? base*0.5 : base; },
-      get blurAllowed(){ return level < 2 && Save.d.settings.blur; },
-      get glowAllowed(){ return level < 2; }
+      sample, setTier,
+      get level(){ return level; },            // 0 potato .. 4 ultra
+      get tierName(){ return TIERS[level]; },
+      get isManual(){ return manual; },
+      particleScale(){ const base = level>=3 ? 1 : level===2 ? 0.55 : level===1 ? 0.3 : 0.15; return Save.d.settings.reduceMotion ? base*0.5 : base; },
+      get blurAllowed(){ return level >= 2 && Save.d.settings.blur; },
+      get glowAllowed(){ return level >= 2; }
     };
   })();
 
@@ -2569,8 +2589,18 @@
     vg.addColorStop(1,'rgba(0,0,0,0.45)');
     c.fillStyle = vg; c.fillRect(0,0,w,h);
   }
+  let __woodFrameCounter = 0;
   function drawWood(dt){
     if(!woodTex) buildWoodTexture();
+    // Ambient background layer only — it drifts slowly, so on weaker devices
+    // we skip redrawing it on alternating (or 2-of-3) frames and simply leave
+    // the previous frame's pixels in place. Saves a full pass of gradients/
+    // shadowBlur strokes with no visible difference for a slow-moving backdrop.
+    __woodFrameCounter++;
+    const lvl = Perf.level; // 0 potato .. 4 ultra
+    if(lvl===2 && (__woodFrameCounter % 2 !== 0)) return;   // medium: every other frame
+    if(lvl<=1 && (__woodFrameCounter % 3 !== 0)) return;    // low/potato: 1 of every 3 frames
+    const fxOn = lvl >= 2; // gate shadowBlur glows off on Potato/Low tiers
     const w = window.innerWidth, h = window.innerHeight;
     const dpr = window.devicePixelRatio||1;
     wctx.setTransform(dpr,0,0,dpr,0,0);
@@ -2690,7 +2720,7 @@
         // vertical neon sign strip
         const col = palette[Math.floor(rnd*4)];
         const flick = 0.55+Math.sin(t2*4+bx)*0.25+Math.sin(t2*9+bx*0.3)*0.2;
-        wctx.save(); wctx.globalAlpha = Math.max(0.15,flick); wctx.fillStyle = col; wctx.shadowBlur = 12; wctx.shadowColor = col;
+        wctx.save(); wctx.globalAlpha = Math.max(0.15,flick); wctx.fillStyle = col; wctx.shadowBlur = fxOn ? 12 : 0; wctx.shadowColor = col;
         wctx.fillRect(bx+bw*0.15, bandY-bh+bh*0.08, bw*0.14, bh*0.7);
         wctx.restore();
         // scattered lit windows
@@ -2721,7 +2751,7 @@
       const crater = wctx.createRadialGradient(cx,peakY+6,0,cx,peakY+6,coneW*0.22);
       crater.addColorStop(0, `rgba(255,140,40,${0.55*pulse})`); crater.addColorStop(1,'rgba(255,90,20,0)');
       wctx.globalCompositeOperation='lighter'; wctx.fillStyle = crater; wctx.beginPath(); wctx.arc(cx,peakY+6,coneW*0.22,0,Math.PI*2); wctx.fill();
-      wctx.strokeStyle = `rgba(255,110,40,${0.5*pulse})`; wctx.lineWidth = 2; wctx.shadowBlur = 10; wctx.shadowColor = 'rgba(255,110,40,0.8)';
+      wctx.strokeStyle = `rgba(255,110,40,${0.5*pulse})`; wctx.lineWidth = 2; wctx.shadowBlur = fxOn ? 10 : 0; wctx.shadowColor = 'rgba(255,110,40,0.8)';
       for(let i=-1;i<=1;i++){
         wctx.beginPath(); wctx.moveTo(cx+i*coneW*0.05, peakY+10);
         wctx.quadraticCurveTo(cx+i*coneW*0.18, baseY*0.6, cx+i*coneW*0.32, baseY);
@@ -2889,7 +2919,7 @@
         wctx.closePath(); wctx.fill();
         const flick = 0.4 + Math.max(0, Math.sin(t2*5 + i*3))*0.6;
         wctx.strokeStyle = palette[i%palette.length]+(0.4*flick)+')';
-        wctx.lineWidth = 1.2; wctx.shadowBlur = 9; wctx.shadowColor = palette[i%palette.length]+'0.8)';
+        wctx.lineWidth = 1.2; wctx.shadowBlur = fxOn ? 9 : 0; wctx.shadowColor = palette[i%palette.length]+'0.8)';
         wctx.beginPath(); wctx.moveTo(cx,cy); wctx.lineTo(ex,ey); wctx.stroke();
       }
       wctx.restore();
@@ -2906,12 +2936,12 @@
         const rad = 18 + prog*280;
         wctx.globalAlpha = (1-prog)*0.55;
         wctx.strokeStyle = 'rgba(178,110,255,0.9)'; wctx.lineWidth = 3*(1-prog)+0.6;
-        wctx.shadowBlur = 14; wctx.shadowColor = 'rgba(178,110,255,0.8)';
+        wctx.shadowBlur = fxOn ? 14 : 0; wctx.shadowColor = 'rgba(178,110,255,0.8)';
         wctx.beginPath(); wctx.arc(rp.x, rp.y, rad, 0, Math.PI*2); wctx.stroke();
         wctx.globalAlpha = (1-prog)*0.3; wctx.strokeStyle = 'rgba(255,255,255,0.8)'; wctx.lineWidth = 1;
         wctx.beginPath(); wctx.arc(rp.x, rp.y, rad*0.68, 0, Math.PI*2); wctx.stroke();
       }
-      wctx.shadowBlur = 0;
+      wctx.shadowBlur = fxOn ? 0 : 0;
       wctx.restore();
     }
 
@@ -2943,7 +2973,7 @@
         wctx.fillRect(pxi-9, gapY-3, 18, 3);
       }
       wctx.strokeStyle = `rgba(170,90,255,${0.4+Math.sin(t2*5)*0.2})`; wctx.lineWidth = 2;
-      wctx.shadowBlur = 12; wctx.shadowColor = 'rgba(170,90,255,0.9)';
+      wctx.shadowBlur = fxOn ? 12 : 0; wctx.shadowColor = 'rgba(170,90,255,0.9)';
       let cx0 = px*0.2-40, seedC = 44;
       while(cx0 < w+60){
         const rnd = mulberry32(Math.floor(cx0)+seedC)();
@@ -2953,7 +2983,7 @@
         wctx.stroke();
         cx0 += 90+rnd*90;
       }
-      wctx.shadowBlur = 0;
+      wctx.shadowBlur = fxOn ? 0 : 0;
       const shaft = wctx.createLinearGradient(0,0,0,h*0.6);
       shaft.addColorStop(0,'rgba(150,120,220,0.10)'); shaft.addColorStop(1,'rgba(150,120,220,0)');
       wctx.globalCompositeOperation='lighter'; wctx.fillStyle = shaft; wctx.fillRect(0,0,w,h*0.6);
@@ -3108,7 +3138,7 @@
       lavaG.addColorStop(0,'rgba(24,6,4,0.4)'); lavaG.addColorStop(1,'rgba(50,10,6,0.8)');
       wctx.fillStyle = lavaG; wctx.fillRect(w*0.5,0,w*0.5,h);
       const pulse = 0.5+Math.sin(t2*1.8)*0.4;
-      wctx.strokeStyle = `rgba(255,120,40,${0.6*pulse})`; wctx.lineWidth = 3; wctx.shadowBlur = 12; wctx.shadowColor='rgba(255,120,40,0.9)';
+      wctx.strokeStyle = `rgba(255,120,40,${0.6*pulse})`; wctx.lineWidth = 3; wctx.shadowBlur = fxOn ? 12 : 0; wctx.shadowColor='rgba(255,120,40,0.9)';
       for(let i=0;i<2;i++){
         const lx = w*0.62+i*w*0.14;
         wctx.beginPath(); wctx.moveTo(lx, h); wctx.quadraticCurveTo(lx+20, h*0.6, lx-10, h*0.3); wctx.stroke();
@@ -3117,9 +3147,9 @@
       wctx.fillStyle = 'rgba(255,160,80,1)'; wctx.fillRect(w*0.5,h*0.55,w*0.5,h*0.4);
       wctx.globalAlpha = 1;
       wctx.restore();
-      wctx.strokeStyle = `rgba(255,200,140,${0.5+Math.sin(t2*3)*0.3})`; wctx.lineWidth = 2.4; wctx.shadowBlur = 14; wctx.shadowColor='rgba(255,180,100,0.9)';
+      wctx.strokeStyle = `rgba(255,200,140,${0.5+Math.sin(t2*3)*0.3})`; wctx.lineWidth = 2.4; wctx.shadowBlur = fxOn ? 14 : 0; wctx.shadowColor='rgba(255,180,100,0.9)';
       wctx.beginPath(); wctx.moveTo(w*0.5,0); wctx.lineTo(w*0.5+Math.sin(t2*2)*6,h); wctx.stroke();
-      wctx.shadowBlur = 0;
+      wctx.shadowBlur = fxOn ? 0 : 0;
       wctx.restore();
     }
 
@@ -3131,7 +3161,7 @@
       for(let i=0;i<3;i++){
         const rnd = mulberry32(i*17+9)();
         const cx2 = w*(0.2+rnd*0.6)+px*0.1, cy2 = h*(0.15+rnd*0.35), r = 26+rnd*14;
-        wctx.strokeStyle = 'rgba(220,210,255,0.35)'; wctx.lineWidth = 2; wctx.shadowBlur = 8; wctx.shadowColor='rgba(180,140,255,0.6)';
+        wctx.strokeStyle = 'rgba(220,210,255,0.35)'; wctx.lineWidth = 2; wctx.shadowBlur = fxOn ? 8 : 0; wctx.shadowColor='rgba(180,140,255,0.6)';
         wctx.beginPath(); wctx.arc(cx2,cy2,r,0,Math.PI*2); wctx.stroke();
         wctx.save(); wctx.translate(cx2,cy2);
         wctx.rotate(t2*(0.6+rnd));
@@ -3140,7 +3170,7 @@
         wctx.beginPath(); wctx.moveTo(0,0); wctx.lineTo(r*0.4,0); wctx.stroke();
         wctx.restore();
       }
-      wctx.shadowBlur = 0;
+      wctx.shadowBlur = fxOn ? 0 : 0;
       for(let i=0;i<2;i++){
         const pxr = w*(0.32+i*0.4)+px*0.15, pyr = h*0.55;
         const scale = 1+Math.sin(t2*1.2+i*2)*0.14;
@@ -3226,7 +3256,7 @@
         if(cyc < 0.15){
           const prog = cyc/0.15;
           const sx0 = w*(0.1+i*0.3)+prog*w*0.3, sy0 = h*0.1+i*40+prog*h*0.18;
-          wctx.strokeStyle = `rgba(255,255,255,${0.7*(1-prog)})`; wctx.lineWidth = 2; wctx.shadowBlur=10; wctx.shadowColor='rgba(255,255,255,0.9)';
+          wctx.strokeStyle = `rgba(255,255,255,${0.7*(1-prog)})`; wctx.lineWidth = 2; wctx.shadowBlur = fxOn ? 10 : 0; wctx.shadowColor='rgba(255,255,255,0.9)';
           wctx.beginPath(); wctx.moveTo(sx0,sy0); wctx.lineTo(sx0-40,sy0-16); wctx.stroke();
         }
       }
@@ -3234,10 +3264,10 @@
         const rnd = mulberry32(i*31+17)();
         const gx = w*rnd, gy = h*(0.72+rnd*0.2);
         const pulse = 0.5+Math.sin(t3*2+i)*0.5;
-        wctx.fillStyle = `rgba(140,220,255,${0.5*pulse})`; wctx.shadowBlur=10; wctx.shadowColor='rgba(140,220,255,0.8)';
+        wctx.fillStyle = `rgba(140,220,255,${0.5*pulse})`; wctx.shadowBlur = fxOn ? 10 : 0; wctx.shadowColor='rgba(140,220,255,0.8)';
         wctx.beginPath(); wctx.moveTo(gx,gy-10); wctx.lineTo(gx+6,gy); wctx.lineTo(gx,gy+10); wctx.lineTo(gx-6,gy); wctx.closePath(); wctx.fill();
       }
-      wctx.shadowBlur = 0;
+      wctx.shadowBlur = fxOn ? 0 : 0;
       wctx.restore();
     }
   }
@@ -4485,7 +4515,7 @@
       const p = pointerToNdc(s.clientX, s.clientY);
       pushInputPoint(p.ndcX, p.ndcY, p.sx, p.sy);
     }
-  });
+  }, {passive:true});
   window.addEventListener('touchmove', (e)=>{
     if(state!=='playing') return;
     if(handDetected && performance.now()-lastHandTime < 700) return;
@@ -4565,7 +4595,7 @@
     // frame — the swipe trail is still driven by the previous landmark each
     // skipped frame, so tracking still feels continuous but frees up real
     // rendering budget where it matters most.
-    const skip = Perf.level>=1 && (handLoopFrame % 2 === 0);
+    const skip = Perf.level<=2 && (handLoopFrame % 2 === 0);
     if(!skip && handsModel && video.readyState >= 2){
       try{ await handsModel.send({ image: video }); }catch(e){ /* transient */ }
     }
@@ -6476,7 +6506,21 @@
     document.getElementById('reduceMotionToggle').classList.toggle('on', Save.d.settings.reduceMotion);
     document.getElementById('highContrastToggle').classList.toggle('on', Save.d.settings.highContrast);
     document.getElementById('acctLabel').textContent = Auth.isLoggedIn() ? ('Signed in as '+Auth.currentUser()) : 'Playing as Guest';
+    updateQualityBtn();
   }
+  const QUALITY_CYCLE = ['auto','potato','low','medium','high','ultra'];
+  function updateQualityBtn(){
+    const q = Save.d.settings.quality || 'auto';
+    const label = q==='auto' ? ('Auto ('+Perf.tierName.charAt(0).toUpperCase()+Perf.tierName.slice(1)+')') : (q.charAt(0).toUpperCase()+q.slice(1));
+    document.getElementById('qualityBtn').textContent = label;
+  }
+  document.getElementById('qualityBtn').addEventListener('click', function(){
+    const cur = Save.d.settings.quality || 'auto';
+    const next = QUALITY_CYCLE[(QUALITY_CYCLE.indexOf(cur)+1) % QUALITY_CYCLE.length];
+    Save.d.settings.quality = next; Save.save();
+    Perf.setTier(next);
+    updateQualityBtn();
+  });
   sensSlider.addEventListener('input', ()=>{ Save.d.settings.sensitivity = parseFloat(sensSlider.value); Save.save(); });
   musicSlider.addEventListener('input', ()=>{ Audio.setMusicVol(parseFloat(musicSlider.value)); Save.save(); });
   sfxSlider.addEventListener('input', ()=>{ Audio.setSfxVol(parseFloat(sfxSlider.value)); Save.save(); });
@@ -6983,6 +7027,7 @@
   ========================================================================= */
   document.body.classList.toggle('reduce-motion', Save.d.settings.reduceMotion);
   document.body.classList.toggle('high-contrast', Save.d.settings.highContrast);
+  if(Save.d.settings.quality && Save.d.settings.quality!=='auto') Perf.setTier(Save.d.settings.quality);
   resize();
   initDust();
   applyBackground(Save.d.equippedBg);
