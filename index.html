@@ -1512,39 +1512,6 @@
   // Lazy external-script loader — used for libraries (mediapipe hands.js,
   // emailjs) that were previously blocking <script> tags at the top of the
   // page but are only needed behind a user action, not on every load.
-  // Generic time-sliced work scheduler — runs an array of small job functions
-  // spread across idle callbacks (falling back to setTimeout chunks where
-  // requestIdleCallback isn't available), so a big batch of work never blocks
-  // the main thread for more than ~8ms at a stretch. Used to keep expensive,
-  // non-essential setup (procedural background art, etc.) off the critical
-  // path right after boot without deferring it so long it never finishes.
-  function runJobsIdle(jobs, onDone){
-    let i = 0;
-    const BUDGET_MS = 8;
-    function runChunk(deadline){
-      const hasIdleApi = deadline && typeof deadline.timeRemaining === 'function';
-      const chunkStart = performance.now();
-      while(i < jobs.length){
-        if(hasIdleApi){
-          if(deadline.timeRemaining() <= 1 && !deadline.didTimeout) break;
-        } else if(performance.now() - chunkStart >= BUDGET_MS){
-          break;
-        }
-        jobs[i](); i++;
-      }
-      if(i < jobs.length){
-        schedule();
-      } else if(onDone){
-        onDone();
-      }
-    }
-    function schedule(){
-      if(window.requestIdleCallback) requestIdleCallback(runChunk, { timeout: 100 });
-      else setTimeout(()=>runChunk(null), 0);
-    }
-    schedule();
-  }
-
   const __scriptPromises = {};
   function loadScriptOnce(src){
     if(__scriptPromises[src]) return __scriptPromises[src];
@@ -2589,7 +2556,7 @@
       c.width = w*dpr; c.height = h*dpr;
       c.style.width = w+'px'; c.style.height = h+'px';
     });
-    scheduleWoodTextureBuild();
+    buildWoodTexture();
   }
   window.addEventListener('resize', resize);
 
@@ -2611,143 +2578,88 @@
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }
-  // The wood-plank backdrop is a one-time procedural paint onto an offscreen
-  // canvas (cached in `woodTex`, then just blitted with cheap parallax every
-  // frame — see drawWood below). At desktop resolutions that one-time paint
-  // is the single most expensive task in the whole boot sequence, so instead
-  // of running it synchronously inside resize() (which used to stall the
-  // main thread for a long stretch right after first paint), it's split into
-  // two phases:
-  //   1) a cheap, synchronous pass that walks the SAME seeded RNG in the
-  //      SAME order as before to produce a plan (plank/knot/grain
-  //      descriptors) — this is just arithmetic, not canvas drawing, so it's
-  //      negligible even at full resolution, and it's what keeps the
-  //      rendered art identical to before.
-  //   2) the actual canvas paint calls (gradients, strokes, fills), which are
-  //      what's expensive, executed a few plans at a time via requestIdleCallback
-  //      so no single task blocks the main thread for more than ~50ms.
-  // A superseded build (e.g. from a resize while one is still in progress)
-  // is detected via `myBuildId` and abandoned instead of racing the newer one.
-  let __woodBuildId = 0;
-  function planWoodTexture(w, h, rnd){
-    const plan = { w, h, planks: [], breaks: [] };
-    const plankW = Math.max(70, w/9);
+  function buildWoodTexture(){
+    const dpr = Math.min(window.devicePixelRatio||1, 2);
+    const w = Math.ceil(window.innerWidth*dpr*1.08); // slight overscan for parallax
+    const h = Math.ceil(window.innerHeight*dpr*1.08);
+    woodTex = document.createElement('canvas');
+    woodTex.width = w; woodTex.height = h;
+    const c = woodTex.getContext('2d');
+    const rnd = mulberry32(20260714);
+    // base dark oak gradient
+    const base = c.createLinearGradient(0,0,0,h);
+    base.addColorStop(0, '#2a1c12');
+    base.addColorStop(0.5, '#1d130c');
+    base.addColorStop(1, '#150e09');
+    c.fillStyle = base; c.fillRect(0,0,w,h);
+    // vertical dojo planks with per-plank tone variance + AO seams
+    const plankW = Math.max(70, w/9) * dpr/dpr; // ~8-9 planks across
     let x = -plankW*0.5*rnd();
     while(x < w){
       const pw = plankW*(0.85+rnd()*0.3);
       const toneShift = (rnd()-0.5)*14;
+      const g = c.createLinearGradient(x,0,x+pw,0);
+      const base1 = 26+toneShift, base2 = 18+toneShift;
+      g.addColorStop(0,   `rgb(${base1+10},${base1*0.6+8},${base1*0.35+4})`);
+      g.addColorStop(0.15,`rgb(${base1+22},${base1*0.65+12},${base1*0.4+6})`);
+      g.addColorStop(0.5, `rgb(${base2+16},${base2*0.6+9},${base2*0.35+5})`);
+      g.addColorStop(0.85,`rgb(${base1+18},${base1*0.62+10},${base1*0.38+5})`);
+      g.addColorStop(1,   `rgb(${base1+8},${base1*0.58+7},${base1*0.32+4})`);
+      c.fillStyle = g;
+      c.fillRect(x,0,pw,h);
+      // grain lines: wavy vertical strokes with natural imperfections
       const grainCount = 5+Math.floor(rnd()*4);
-      const grains = [];
       for(let i=0;i<grainCount;i++){
-        const gxFrac = rnd();
-        const segs = [];
+        const gx = x + rnd()*pw;
+        c.beginPath();
+        c.moveTo(gx, 0);
         let cy = 0;
         while(cy < h){
           const step = 40+rnd()*70;
           const drift = (rnd()-0.5)*18;
-          segs.push({ step, drift });
+          c.quadraticCurveTo(gx+drift*0.5, cy+step*0.5, gx+drift, cy+step);
           cy += step;
         }
-        grains.push({ gxFrac, segs, strokeAlpha: 0.08+rnd()*0.14, lineWidth: 0.6+rnd()*1.4 });
+        c.strokeStyle = `rgba(10,6,3,${0.08+rnd()*0.14})`;
+        c.lineWidth = 0.6+rnd()*1.4;
+        c.stroke();
       }
-      let knot = null;
+      // occasional knot
       if(rnd() < 0.35){
-        const kyFrac = rnd(), kxOff = (rnd()-0.5), kr = 6+rnd()*10, ang = rnd()*Math.PI;
-        knot = { kyFrac, kxOff, kr, ang };
+        const ky = rnd()*h, kx = x+pw*0.5+(rnd()-0.5)*pw*0.4, kr = 6+rnd()*10;
+        const kg = c.createRadialGradient(kx,ky,0,kx,ky,kr*2.2);
+        kg.addColorStop(0,'rgba(8,5,3,0.55)');
+        kg.addColorStop(0.4,'rgba(8,5,3,0.28)');
+        kg.addColorStop(1,'rgba(8,5,3,0)');
+        c.fillStyle = kg;
+        c.beginPath(); c.ellipse(kx,ky,kr*2.2,kr*1.5,0,0,Math.PI*2); c.fill();
+        c.strokeStyle = 'rgba(6,4,2,0.5)'; c.lineWidth = 1.5;
+        c.beginPath(); c.ellipse(kx,ky,kr*0.6,kr*0.4,rnd()*Math.PI,0,Math.PI*2); c.stroke();
       }
-      plan.planks.push({ x, pw, toneShift, grains, knot });
+      // seam shadow between planks
+      c.fillStyle = 'rgba(0,0,0,0.35)';
+      c.fillRect(x+pw-1.4, 0, 2.2, h);
+      c.fillStyle = 'rgba(255,220,180,0.04)';
+      c.fillRect(x+pw+0.8, 0, 1, h);
       x += pw;
     }
+    // horizontal plank breaks for a floor/wall panel look
     let y = 0;
     while(y < h){
       const ph = h/5.5*(0.85+rnd()*0.3);
-      plan.breaks.push(y+ph-1);
+      c.fillStyle = 'rgba(0,0,0,0.22)';
+      c.fillRect(0, y+ph-1, w, 2);
       y += ph;
     }
-    return plan;
-  }
-  function paintWoodPlank(c, h, plank){
-    const { x, pw, toneShift, grains, knot } = plank;
-    const g = c.createLinearGradient(x,0,x+pw,0);
-    const base1 = 26+toneShift, base2 = 18+toneShift;
-    g.addColorStop(0,   `rgb(${base1+10},${base1*0.6+8},${base1*0.35+4})`);
-    g.addColorStop(0.15,`rgb(${base1+22},${base1*0.65+12},${base1*0.4+6})`);
-    g.addColorStop(0.5, `rgb(${base2+16},${base2*0.6+9},${base2*0.35+5})`);
-    g.addColorStop(0.85,`rgb(${base1+18},${base1*0.62+10},${base1*0.38+5})`);
-    g.addColorStop(1,   `rgb(${base1+8},${base1*0.58+7},${base1*0.32+4})`);
-    c.fillStyle = g;
-    c.fillRect(x,0,pw,h);
-    grains.forEach(gr=>{
-      const gx = x + gr.gxFrac*pw;
-      c.beginPath();
-      c.moveTo(gx, 0);
-      let cy = 0;
-      gr.segs.forEach(seg=>{
-        c.quadraticCurveTo(gx+seg.drift*0.5, cy+seg.step*0.5, gx+seg.drift, cy+seg.step);
-        cy += seg.step;
-      });
-      c.strokeStyle = `rgba(10,6,3,${gr.strokeAlpha})`;
-      c.lineWidth = gr.lineWidth;
-      c.stroke();
-    });
-    if(knot){
-      const ky = knot.kyFrac*h, kx = x+pw*0.5+knot.kxOff*pw*0.4, kr = knot.kr;
-      const kg = c.createRadialGradient(kx,ky,0,kx,ky,kr*2.2);
-      kg.addColorStop(0,'rgba(8,5,3,0.55)');
-      kg.addColorStop(0.4,'rgba(8,5,3,0.28)');
-      kg.addColorStop(1,'rgba(8,5,3,0)');
-      c.fillStyle = kg;
-      c.beginPath(); c.ellipse(kx,ky,kr*2.2,kr*1.5,0,0,Math.PI*2); c.fill();
-      c.strokeStyle = 'rgba(6,4,2,0.5)'; c.lineWidth = 1.5;
-      c.beginPath(); c.ellipse(kx,ky,kr*0.6,kr*0.4,knot.ang,0,Math.PI*2); c.stroke();
-    }
-    c.fillStyle = 'rgba(0,0,0,0.35)';
-    c.fillRect(x+pw-1.4, 0, 2.2, h);
-    c.fillStyle = 'rgba(255,220,180,0.04)';
-    c.fillRect(x+pw+0.8, 0, 1, h);
-  }
-  function scheduleWoodTextureBuild(){
-    const myBuildId = ++__woodBuildId;
-    const dpr = Math.min(window.devicePixelRatio||1, 2);
-    const w = Math.ceil(window.innerWidth*dpr*1.08); // slight overscan for parallax
-    const h = Math.ceil(window.innerHeight*dpr*1.08);
-    const rnd = mulberry32(20260714);
-    const plan = planWoodTexture(w, h, rnd); // cheap — pure arithmetic, safe to run synchronously
-    const tex = document.createElement('canvas');
-    tex.width = w; tex.height = h;
-    const c = tex.getContext('2d');
-
-    const jobs = [];
-    jobs.push(()=>{
-      const base = c.createLinearGradient(0,0,0,h);
-      base.addColorStop(0, '#2a1c12');
-      base.addColorStop(0.5, '#1d130c');
-      base.addColorStop(1, '#150e09');
-      c.fillStyle = base; c.fillRect(0,0,w,h);
-    });
-    plan.planks.forEach(plank=>{ jobs.push(()=>paintWoodPlank(c, h, plank)); });
-    jobs.push(()=>{
-      plan.breaks.forEach(by=>{
-        c.fillStyle = 'rgba(0,0,0,0.22)';
-        c.fillRect(0, by, w, 2);
-      });
-      const vg = c.createRadialGradient(w*0.5,h*0.42,0,w*0.5,h*0.42,Math.max(w,h)*0.75);
-      vg.addColorStop(0,'rgba(0,0,0,0)');
-      vg.addColorStop(1,'rgba(0,0,0,0.45)');
-      c.fillStyle = vg; c.fillRect(0,0,w,h);
-    });
-    runJobsIdle(jobs, ()=>{
-      if(myBuildId !== __woodBuildId) return; // a newer resize superseded this build
-      woodTex = tex;
-    });
+    // soft ambient occlusion vignette baked into the wood itself
+    const vg = c.createRadialGradient(w*0.5,h*0.42,0,w*0.5,h*0.42,Math.max(w,h)*0.75);
+    vg.addColorStop(0,'rgba(0,0,0,0)');
+    vg.addColorStop(1,'rgba(0,0,0,0.45)');
+    c.fillStyle = vg; c.fillRect(0,0,w,h);
   }
   let __woodFrameCounter = 0;
   function drawWood(dt){
-    // If the (idle-scheduled) build hasn't finished yet, just skip this
-    // frame's wood layer rather than forcing the expensive build to run
-    // synchronously here — the CSS background underneath still shows, and
-    // the texture is normally ready within the first few frames anyway.
-    if(!woodTex) return;
+    if(!woodTex) buildWoodTexture();
     // Ambient background layer only — it drifts slowly, so on weaker devices
     // we skip redrawing it on alternating (or 2-of-3) frames and simply leave
     // the previous frame's pixels in place. Saves a full pass of gradients/
@@ -7213,6 +7125,7 @@
   if(Save.d.settings.quality && Save.d.settings.quality!=='auto') Perf.setTier(Save.d.settings.quality);
   else Perf.syncNow(); // push the heuristic-picked level to the renderer from frame one
   resize();
+  initDust();
   applyBackground(Save.d.equippedBg);
   renderLives();
   updateScoreHud();
