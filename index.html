@@ -863,14 +863,14 @@
     padding:8px 16px; border-radius:20px; background:rgba(120,80,255,0.08);
     border:1px solid rgba(120,80,255,0.18);
   }
-  #introSkip{
+  #bootSkip, #introSkip{
     position:absolute; bottom:20px; right:20px; z-index:4;
     background:linear-gradient(135deg, rgba(198,120,255,0.14), rgba(120,200,255,0.1));
     border:1px solid rgba(198,120,255,0.4); color:var(--text-primary); font-size:11px; letter-spacing:0.08em;
     padding:9px 16px; border-radius:20px; cursor:pointer; font-family:'Space Grotesk',sans-serif;
     box-shadow:0 0 14px rgba(198,120,255,0.2); text-transform:uppercase; font-weight:600;
   }
-  #introSkip:active{ transform:scale(0.95); }
+  #bootSkip:active, #introSkip:active{ transform:scale(0.95); }
 
   /* katana slash across the logo during loading reveal */
   .cineKatana{
@@ -936,6 +936,7 @@
     </div>
     <p id="bootTip">Tip: swipe with your index finger to slice fruit mid-air.</p>
   </div>
+  <button id="bootSkip" type="button">Skip ▸</button>
 </div>
 
 <div id="introOverlay" class="goneHidden">
@@ -999,7 +1000,6 @@
 
   <!-- LOGIN / ACCOUNT -->
   <div class="overlay hidden" id="loginScreen">
-    <button class="closeX" id="closeLoginScreen">✕</button>
     <p class="eyebrow">Dojo Slash</p>
     <h1 class="title" style="font-size:34px;">SIGN <span>IN</span></h1>
     <p class="sub">Create a dojo account to keep your coins, gems and unlocks safe on this device — or jump straight in as a guest.</p>
@@ -1418,7 +1418,6 @@
       <div class="scrollArea">
         <div class="settingRow"><label>Player Name</label><button class="btn secondary small" id="changeNameBtn" style="padding:8px 16px;">Change Name</button></div>
         <div class="settingRow"><label>Account</label><span id="acctLabel" style="font-size:11px; color:var(--text-dim);"></span></div>
-        <div class="settingRow"><label>&nbsp;</label><button class="btn secondary small" id="createAcctBtn" style="padding:8px 16px;">✉️ Create Account / Sign In</button></div>
         <div class="settingRow"><label>&nbsp;</label><button class="btn secondary small" id="logoutBtn" style="padding:8px 16px;">🚪 Logout</button></div>
         <div class="settingRow"><label>Invite Friends</label><button class="btn secondary small" id="inviteBtnSettings" style="padding:8px 16px;">🎁 Invite</button></div>
         <div class="settingRow"><label>Quality</label><button class="btn secondary small" id="qualityBtn" style="padding:8px 16px; min-width:104px;">Auto</button></div>
@@ -1499,31 +1498,12 @@
 <video id="video" autoplay playsinline muted style="display:none;"></video>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<!-- hands.js (gesture tracking) and emailjs (payment/account notification
-     emails) used to be blocking script tags here, downloaded + parsed + executed
-     before the game could show a single frame — even though neither is used
-     until the player opts into camera mode or submits a payment/registers.
-     They're now lazy-loaded on first actual use (see loadScriptOnce below). -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 
 <script>
 (function(){
   "use strict";
-
-  // Lazy external-script loader — used for libraries (mediapipe hands.js,
-  // emailjs) that were previously blocking <script> tags at the top of the
-  // page but are only needed behind a user action, not on every load.
-  const __scriptPromises = {};
-  function loadScriptOnce(src){
-    if(__scriptPromises[src]) return __scriptPromises[src];
-    __scriptPromises[src] = new Promise((resolve, reject)=>{
-      const s = document.createElement('script');
-      s.src = src; s.crossOrigin = 'anonymous';
-      s.onload = ()=>resolve();
-      s.onerror = ()=>{ delete __scriptPromises[src]; reject(new Error('Failed to load '+src)); };
-      document.head.appendChild(s);
-    });
-    return __scriptPromises[src];
-  }
 
   /* =========================================================================
      ACCOUNT / LOGIN MODULE
@@ -1673,14 +1653,7 @@
     const cores = navigator.hardwareConcurrency || 4;
     const mem = navigator.deviceMemory || 4; // GB, when the browser exposes it
     const isCoarsePointer = window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
-    // Was gated on `isCoarsePointer &&` — meaning a weak-CPU laptop/desktop
-    // with a mouse (low cores, non-coarse pointer) never got pre-lowered and
-    // started at level 3 ('high') regardless of hardware. Cores/memory alone
-    // are a valid signal on ANY pointer type, so check them independently of
-    // touch as well as combined with it.
-    if(cores <= 4 || mem <= 3) level = 2;             // medium: weak CPU/RAM, any input type
     if(isCoarsePointer && (cores <= 4 || mem <= 3)) level = 2;      // medium: weaker phone
-    if(cores <= 2 || mem <= 2) level = 0;              // potato: very weak CPU/RAM, any input type
     if(isCoarsePointer && (cores <= 2 || mem <= 2)) level = 0;      // potato: very weak phone
     function sample(dt){
       if(manual) return; // player pinned a tier — don't fight their choice
@@ -1719,13 +1692,6 @@
     }
     return {
       sample, setTier,
-      // Startup only calls setTier() when the player has a manual quality
-      // saved; for 'auto' players the heuristic-picked `level` above was
-      // never actually pushed to the renderer (shadowMap/pixelRatio) until
-      // the FIRST reactive downgrade — meaning even a device correctly
-      // detected as weak at page load still rendered at full shadows/DPR
-      // for the first second-plus. Exposed so boot can sync it immediately.
-      syncNow: applyLevel,
       get level(){ return level; },            // 0 potato .. 4 ultra
       get tierName(){ return TIERS[level]; },
       get isManual(){ return manual; },
@@ -2354,29 +2320,13 @@
   const EMAILJS_PUBLIC_KEY  = 'YOUR_EMAILJS_PUBLIC_KEY';
   const EMAILJS_SERVICE_ID  = 'YOUR_EMAILJS_SERVICE_ID';
   const EMAILJS_TEMPLATE_ID = 'YOUR_EMAILJS_TEMPLATE_ID';
-  const EMAILJS_CONFIGURED = EMAILJS_PUBLIC_KEY && EMAILJS_PUBLIC_KEY.indexOf('YOUR_')!==0;
   let emailjsReady = false;
-  let __emailjsLoadPromise = null;
-  // Was: eagerly loaded + initialized the emailjs library on every page load,
-  // even though EMAILJS_PUBLIC_KEY is the unfilled 'YOUR_...' placeholder in
-  // this build — meaning the ~full library download+parse+execute happened
-  // for a feature that could never actually send anything. Now the script
-  // isn't even requested unless the keys are filled in AND a send is about
-  // to happen.
-  function ensureEmailJs(){
-    if(!EMAILJS_CONFIGURED) return Promise.resolve(false);
-    if(emailjsReady) return Promise.resolve(true);
-    if(!__emailjsLoadPromise){
-      __emailjsLoadPromise = loadScriptOnce('https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js')
-        .then(()=>{
-          emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
-          emailjsReady = true;
-          return true;
-        })
-        .catch(e=>{ console.warn('EmailJS load/init failed', e); return false; });
+  try{
+    if(window.emailjs && EMAILJS_PUBLIC_KEY && EMAILJS_PUBLIC_KEY.indexOf('YOUR_')!==0){
+      emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+      emailjsReady = true;
     }
-    return __emailjsLoadPromise;
-  }
+  }catch(e){ console.warn('EmailJS init failed', e); }
 
   const COIN_PACKS = [
     { id:'pack_100',   coins:100,   priceInr:9,   label:'Tiny Pack' },
@@ -2487,16 +2437,7 @@
   // Cheap upfront heuristic (same signal the Perf module uses) so weak/mobile
   // devices never even pay for antialiasing — smoother from frame one instead
   // of waiting for the adaptive system to notice and downgrade later.
-  // NOTE: previously this also required `pointer:coarse` (touch), which meant
-  // a weak-CPU/integrated-GPU laptop or desktop using a mouse was NEVER
-  // treated as a weak device at startup — it always got antialiasing + full
-  // DPR + shadows on frame one and had to wait for the reactive stutter
-  // detector to claw it back. Core/memory count alone is a fine signal
-  // regardless of pointer type, so the pointer check is now just an extra
-  // way IN, not a requirement.
-  const __lowSpecHint = (navigator.hardwareConcurrency||4) <= 4 || (navigator.deviceMemory||4) <= 4;
-  const __coarsePointerHint = window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
-  const __weakDeviceHint = __lowSpecHint || __coarsePointerHint;
+  const __weakDeviceHint = (navigator.hardwareConcurrency||4) <= 4 && window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias:!__weakDeviceHint, alpha:true, powerPreference:'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, __weakDeviceHint ? 1.5 : 2));
   renderer.shadowMap.enabled = true;
@@ -4607,11 +4548,7 @@
     video.srcObject = cameraStream;
     await video.play();
   }
-  async function initHands(){
-    // hands.js used to be a blocking <script> tag loaded on every page visit;
-    // now it's fetched here, the first time someone actually opts into
-    // gesture/camera mode, and cached (loadScriptOnce) if they toggle it again.
-    await loadScriptOnce('https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js');
+  function initHands(){
     handsModel = new Hands({ locateFile:(file)=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
     handsModel.setOptions({ maxNumHands:1, modelComplexity:0, minDetectionConfidence:0.6, minTrackingConfidence:0.5, selfieMode:true });
     handsModel.onResults(onHandResults);
@@ -4679,7 +4616,7 @@
       statusLine.textContent = 'Requesting camera…';
       await initCamera();
       statusLine.textContent = 'Loading hand-tracking model…';
-      await initHands();
+      initHands();
       handLoopRunning = true;
       handLoop();
       statusLine.textContent = 'Camera ready — show your hand!';
@@ -5156,19 +5093,10 @@
   function tick(){
     if(document.hidden){ __loopPaused = true; return; } // stop scheduling frames while backgrounded
     const now = performance.now();
-    const trueDt = (now-lastT)/1000; lastT = now;
-    // Physics/animation always use a clamped dt (a 200ms stall shouldn't make
-    // a fruit teleport across the screen next frame) — but the adaptive
-    // quality system needs to see the REAL frame time to detect stutters.
-    // Previously `rawDt` was clamped to 0.033 (a 30fps floor) BEFORE being
-    // passed to Perf.sample(), so a true 100ms+ stall was reported as a tidy
-    // 30fps sample — the fast-track "8 bad frames in a row" stutter detector
-    // could mathematically never fire, since 1/0.033 never drops below the
-    // 28fps trigger. This is a major reason the quality system never
-    // downgraded on real-world hitches on slower hardware.
-    let rawDt = Math.min(trueDt, 0.033);
+    let rawDt = (now-lastT)/1000; lastT = now;
+    rawDt = Math.min(rawDt, 0.033);
     requestAnimationFrame(tick);
-    Perf.sample(trueDt);
+    Perf.sample(rawDt);
 
     // camera shake
     if(camShake.t>0){
@@ -6087,7 +6015,7 @@
     if(!result.ok){ authError.textContent = result.error; return; }
     // Welcome email on successful account creation (best-effort — never blocks
     // account creation if EmailJS isn't configured or the send fails).
-    if(authMode==='register' && await ensureEmailJs()){
+    if(authMode==='register' && emailjsReady){
       try{
         emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
           to_email: authEmailInput.value.trim(),
@@ -6107,15 +6035,6 @@
     Audio.SFX.click();
     Auth.continueAsGuest();
     location.reload();
-  });
-  document.getElementById('closeLoginScreen').addEventListener('click', ()=>{
-    Audio.SFX.click();
-    closeOverlay('loginScreen');
-  });
-  document.getElementById('createAcctBtn').addEventListener('click', ()=>{
-    Audio.SFX.click();
-    closeOverlay('settingsScreen');
-    openOverlay('loginScreen');
   });
   document.getElementById('logoutBtn').addEventListener('click', ()=>{
     Audio.SFX.click();
@@ -6470,7 +6389,7 @@
     Audio.SFX.click();
     closeOverlay('verifyModal');
   });
-  document.getElementById('submitProofBtn').addEventListener('click', async ()=>{
+  document.getElementById('submitProofBtn').addEventListener('click', ()=>{
     const name = document.getElementById('vfName').value.trim();
     const utr = document.getElementById('vfUtr').value.trim();
     if(!name){ showToast('⚠️','Please enter your player name'); return; }
@@ -6496,7 +6415,7 @@
     // game owner manually approves the request (see Dev Panel > Pending Payments).
     // Notify the game owner by email right away — without this step the
     // request only exists in the player's own browser and nobody sees it.
-    if(await ensureEmailJs()){
+    if(emailjsReady){
       emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
         player_name: name,
         player_id: Save.d.playerId,
@@ -6596,8 +6515,6 @@
     document.getElementById('reduceMotionToggle').classList.toggle('on', Save.d.settings.reduceMotion);
     document.getElementById('highContrastToggle').classList.toggle('on', Save.d.settings.highContrast);
     document.getElementById('acctLabel').textContent = Auth.isLoggedIn() ? ('Signed in as '+Auth.currentUser()) : 'Playing as Guest';
-    document.getElementById('createAcctBtn').classList.toggle('hidden', Auth.isLoggedIn());
-    document.getElementById('logoutBtn').classList.toggle('hidden', !Auth.isLoggedIn());
     updateQualityBtn();
   }
   const QUALITY_CYCLE = ['auto','potato','low','medium','high','ultra'];
@@ -7037,6 +6954,7 @@
       const fill = document.getElementById('bootBarFill');
       const pct = document.getElementById('bootPercent');
       const tipEl = document.getElementById('bootTip');
+      const skipBtn = document.getElementById('bootSkip');
       const particles = petalField(document.getElementById('bootParticleCanvas'), 1);
 
       let tipIdx = 0;
@@ -7050,12 +6968,7 @@
       else window.addEventListener('load', ()=>readiness.loaded=true, { once:true });
 
       const start = performance.now();
-      // Was MIN_MS 2200 / MAX_MS 5000 with a manual Skip button as the escape
-      // hatch for anyone who found that dragged. The skip button is gone now,
-      // so the bar itself is the escape hatch: shortened substantially, and
-      // MAX_MS (the hard ceiling regardless of actual readiness) is tightened
-      // to match, so a slow-loading device still can't get stuck long.
-      const MIN_MS = 700, MAX_MS = 1800;
+      const MIN_MS = 2200, MAX_MS = 5000;
       let finished = false;
       function finish(){
         if(finished) return; finished = true;
@@ -7064,6 +6977,7 @@
         overlay.classList.add('fadeOut');
         setTimeout(()=>{ overlay.classList.add('goneHidden'); done(); }, 700);
       }
+      skipBtn.addEventListener('click', ()=>{ Audio.SFX.click(); finish(); });
 
       function tickBar(){
         if(finished) return;
@@ -7123,7 +7037,6 @@
   document.body.classList.toggle('reduce-motion', Save.d.settings.reduceMotion);
   document.body.classList.toggle('high-contrast', Save.d.settings.highContrast);
   if(Save.d.settings.quality && Save.d.settings.quality!=='auto') Perf.setTier(Save.d.settings.quality);
-  else Perf.syncNow(); // push the heuristic-picked level to the renderer from frame one
   resize();
   initDust();
   applyBackground(Save.d.equippedBg);
@@ -7134,12 +7047,10 @@
   tick();
 
   function finalBoot(){
-    // Used to force every brand-new player through the loginScreen
-    // (login/register/guest) before they could even see the start screen.
-    // Now guests are assigned automatically and silently — account
-    // creation/sign-in moved to Settings ("Create Account / Sign In") for
-    // anyone who wants to opt in later, instead of gating first launch.
-    if(!Auth.currentUser()) Auth.continueAsGuest();
+    if(!Auth.currentUser()){
+      openOverlay('loginScreen');
+      return;
+    }
     if(Save.d.playerName){
       refreshNameDisplays();
       openOverlay('startScreen');
