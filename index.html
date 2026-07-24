@@ -714,18 +714,22 @@
     background:linear-gradient(180deg, #0a0715 0%, #0a0612 55%, #050308 100%);
   }
   .cineWood::before{
-    content:''; position:absolute; left:-50%; right:-50%; bottom:-10%; height:80%;
+    content:''; position:absolute; left:-50%; right:-150%; bottom:-10%; height:160%;
     background-image:
       linear-gradient(rgba(120,80,255,0.35) 1px, transparent 1px),
       linear-gradient(90deg, rgba(120,80,255,0.35) 1px, transparent 1px);
     background-size:48px 48px;
-    transform:rotateX(72deg);
+    transform:rotateX(72deg) translateZ(0);
     transform-origin:bottom;
     -webkit-mask-image:linear-gradient(180deg, transparent, #000 35%);
     mask-image:linear-gradient(180deg, transparent, #000 35%);
     animation:gridDrift 6s linear infinite;
+    will-change:transform;
   }
-  @keyframes gridDrift{ from{ background-position:0 0; } to{ background-position:0 48px; } }
+  /* was background-position (CPU repaint every frame); now a compositor-only
+     transform translating a tile that's pre-doubled in height so the seam
+     never shows. Same visual drift, GPU-composited. */
+  @keyframes gridDrift{ from{ transform:rotateX(72deg) translateZ(0) translateY(0); } to{ transform:rotateX(72deg) translateZ(0) translateY(48px); } }
   .cineWood::after{
     content:''; position:absolute; inset:0;
     background:radial-gradient(ellipse at 50% 78%, rgba(255,140,59,0.12), transparent 45%);
@@ -735,11 +739,16 @@
 
   /* slow-scanning holographic sweep */
   .cineScan{
-    position:absolute; left:0; right:0; height:140px; z-index:2; pointer-events:none;
+    position:absolute; left:0; right:0; top:-20%; height:140px; z-index:2; pointer-events:none;
     background:linear-gradient(180deg, transparent, rgba(198,255,255,0.08), rgba(198,120,255,0.05), transparent);
     animation:scanSweep 4.5s ease-in-out infinite;
+    will-change:transform;
   }
-  @keyframes scanSweep{ 0%{ top:-20%; } 50%{ top:100%; } 100%{ top:-20%; } }
+  /* was animating `top` (forces layout+paint on the containing block — a
+     fixed, full-viewport overlay — every frame); now translateY off the same
+     -20% base using vh units (containing block is 100vh), compositor-only.
+     Same start/mid/end positions as the original 0%/100%/0% top keyframes. */
+  @keyframes scanSweep{ 0%{ transform:translateY(0); } 50%{ transform:translateY(120vh); } 100%{ transform:translateY(0); } }
 
   .cineRays{
     position:absolute; inset:-20%; pointer-events:none; opacity:0.4; mix-blend-mode:screen;
@@ -1644,7 +1653,14 @@
     const cores = navigator.hardwareConcurrency || 4;
     const mem = navigator.deviceMemory || 4; // GB, when the browser exposes it
     const isCoarsePointer = window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
+    // Was gated on `isCoarsePointer &&` — meaning a weak-CPU laptop/desktop
+    // with a mouse (low cores, non-coarse pointer) never got pre-lowered and
+    // started at level 3 ('high') regardless of hardware. Cores/memory alone
+    // are a valid signal on ANY pointer type, so check them independently of
+    // touch as well as combined with it.
+    if(cores <= 4 || mem <= 3) level = 2;             // medium: weak CPU/RAM, any input type
     if(isCoarsePointer && (cores <= 4 || mem <= 3)) level = 2;      // medium: weaker phone
+    if(cores <= 2 || mem <= 2) level = 0;              // potato: very weak CPU/RAM, any input type
     if(isCoarsePointer && (cores <= 2 || mem <= 2)) level = 0;      // potato: very weak phone
     function sample(dt){
       if(manual) return; // player pinned a tier — don't fight their choice
@@ -1683,6 +1699,13 @@
     }
     return {
       sample, setTier,
+      // Startup only calls setTier() when the player has a manual quality
+      // saved; for 'auto' players the heuristic-picked `level` above was
+      // never actually pushed to the renderer (shadowMap/pixelRatio) until
+      // the FIRST reactive downgrade — meaning even a device correctly
+      // detected as weak at page load still rendered at full shadows/DPR
+      // for the first second-plus. Exposed so boot can sync it immediately.
+      syncNow: applyLevel,
       get level(){ return level; },            // 0 potato .. 4 ultra
       get tierName(){ return TIERS[level]; },
       get isManual(){ return manual; },
@@ -2428,7 +2451,16 @@
   // Cheap upfront heuristic (same signal the Perf module uses) so weak/mobile
   // devices never even pay for antialiasing — smoother from frame one instead
   // of waiting for the adaptive system to notice and downgrade later.
-  const __weakDeviceHint = (navigator.hardwareConcurrency||4) <= 4 && window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
+  // NOTE: previously this also required `pointer:coarse` (touch), which meant
+  // a weak-CPU/integrated-GPU laptop or desktop using a mouse was NEVER
+  // treated as a weak device at startup — it always got antialiasing + full
+  // DPR + shadows on frame one and had to wait for the reactive stutter
+  // detector to claw it back. Core/memory count alone is a fine signal
+  // regardless of pointer type, so the pointer check is now just an extra
+  // way IN, not a requirement.
+  const __lowSpecHint = (navigator.hardwareConcurrency||4) <= 4 || (navigator.deviceMemory||4) <= 4;
+  const __coarsePointerHint = window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
+  const __weakDeviceHint = __lowSpecHint || __coarsePointerHint;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias:!__weakDeviceHint, alpha:true, powerPreference:'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, __weakDeviceHint ? 1.5 : 2));
   renderer.shadowMap.enabled = true;
@@ -5084,10 +5116,19 @@
   function tick(){
     if(document.hidden){ __loopPaused = true; return; } // stop scheduling frames while backgrounded
     const now = performance.now();
-    let rawDt = (now-lastT)/1000; lastT = now;
-    rawDt = Math.min(rawDt, 0.033);
+    const trueDt = (now-lastT)/1000; lastT = now;
+    // Physics/animation always use a clamped dt (a 200ms stall shouldn't make
+    // a fruit teleport across the screen next frame) — but the adaptive
+    // quality system needs to see the REAL frame time to detect stutters.
+    // Previously `rawDt` was clamped to 0.033 (a 30fps floor) BEFORE being
+    // passed to Perf.sample(), so a true 100ms+ stall was reported as a tidy
+    // 30fps sample — the fast-track "8 bad frames in a row" stutter detector
+    // could mathematically never fire, since 1/0.033 never drops below the
+    // 28fps trigger. This is a major reason the quality system never
+    // downgraded on real-world hitches on slower hardware.
+    let rawDt = Math.min(trueDt, 0.033);
     requestAnimationFrame(tick);
-    Perf.sample(rawDt);
+    Perf.sample(trueDt);
 
     // camera shake
     if(camShake.t>0){
@@ -7028,6 +7069,7 @@
   document.body.classList.toggle('reduce-motion', Save.d.settings.reduceMotion);
   document.body.classList.toggle('high-contrast', Save.d.settings.highContrast);
   if(Save.d.settings.quality && Save.d.settings.quality!=='auto') Perf.setTier(Save.d.settings.quality);
+  else Perf.syncNow(); // push the heuristic-picked level to the renderer from frame one
   resize();
   initDust();
   applyBackground(Save.d.equippedBg);
