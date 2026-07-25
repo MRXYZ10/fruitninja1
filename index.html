@@ -5,7 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>Dojo Slash — Gesture Fruit Ninja</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- fonts.googleapis.com only serves the CSS; the actual font FILES come
+     from fonts.gstatic.com — a different origin that wasn't preconnected,
+     so the browser paid a fresh DNS+TLS handshake before the fonts could
+     even start downloading. Also dropped weight 500, which the CSS never
+     actually uses (only 400/600/700 appear anywhere) — one fewer font file
+     to fetch/parse for no visual change. -->
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg-void:#0a0c12;
@@ -997,29 +1004,6 @@
   </div>
   <div id="pipLabel">hand feed</div>
 
-  <!-- LOGIN / ACCOUNT -->
-  <div class="overlay hidden" id="loginScreen">
-    <button class="closeX" id="closeLoginScreen">✕</button>
-    <p class="eyebrow">Dojo Slash</p>
-    <h1 class="title" style="font-size:34px;">SIGN <span>IN</span></h1>
-    <p class="sub">Create a dojo account to keep your coins, gems and unlocks safe on this device — or jump straight in as a guest.</p>
-    <div class="btnRow" style="margin-bottom:14px;">
-      <button class="authTabBtn active" id="authTabLogin" data-authtab="login">Login</button>
-      <button class="authTabBtn" id="authTabRegister" data-authtab="register">Create Account</button>
-    </div>
-    <input type="text" id="authUserInput" class="devInput" placeholder="Username" maxlength="20" autocomplete="off" spellcheck="false" style="max-width:320px;">
-    <input type="email" id="authEmailInput" class="devInput hidden" placeholder="Email" maxlength="80" autocomplete="off" spellcheck="false" style="max-width:320px; margin-top:10px;">
-    <input type="password" id="authPassInput" class="devInput" placeholder="Password" maxlength="40" autocomplete="off" style="max-width:320px; margin-top:10px;">
-    <input type="password" id="authPassConfirmInput" class="devInput hidden" placeholder="Confirm password" maxlength="40" autocomplete="off" style="max-width:320px; margin-top:10px;">
-    <p id="authError" style="color:#ff6a6a; font-size:12px; min-height:16px; margin-top:10px;"></p>
-    <div class="btnRow" style="margin-top:6px;">
-      <button class="btn" id="authSubmitBtn">Login</button>
-    </div>
-    <div class="btnRow" style="margin-top:14px;">
-      <button class="btn secondary small" id="authGuestBtn">Continue as Guest</button>
-    </div>
-  </div>
-
   <!-- NAME ENTRY -->
   <div class="overlay hidden" id="nameScreen">
     <p class="eyebrow">Welcome to Dojo Slash</p>
@@ -1190,6 +1174,32 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- LOGIN / ACCOUNT (moved after startScreen: this is now only ever opened
+       from Settings, on top of an already-visible startScreen underneath —
+       DOM order determines paint order at equal z-index, so this must come
+       AFTER startScreen or startScreen paints over it and it's invisible) -->
+  <div class="overlay hidden" id="loginScreen">
+    <button class="closeX" id="closeLoginScreen">✕</button>
+    <p class="eyebrow">Dojo Slash</p>
+    <h1 class="title" style="font-size:34px;">SIGN <span>IN</span></h1>
+    <p class="sub">Create a dojo account to keep your coins, gems and unlocks safe on this device — or jump straight in as a guest.</p>
+    <div class="btnRow" style="margin-bottom:14px;">
+      <button class="authTabBtn active" id="authTabLogin" data-authtab="login">Login</button>
+      <button class="authTabBtn" id="authTabRegister" data-authtab="register">Create Account</button>
+    </div>
+    <input type="text" id="authUserInput" class="devInput" placeholder="Username" maxlength="20" autocomplete="off" spellcheck="false" style="max-width:320px;">
+    <input type="email" id="authEmailInput" class="devInput hidden" placeholder="Email" maxlength="80" autocomplete="off" spellcheck="false" style="max-width:320px; margin-top:10px;">
+    <input type="password" id="authPassInput" class="devInput" placeholder="Password" maxlength="40" autocomplete="off" style="max-width:320px; margin-top:10px;">
+    <input type="password" id="authPassConfirmInput" class="devInput hidden" placeholder="Confirm password" maxlength="40" autocomplete="off" style="max-width:320px; margin-top:10px;">
+    <p id="authError" style="color:#ff6a6a; font-size:12px; min-height:16px; margin-top:10px;"></p>
+    <div class="btnRow" style="margin-top:6px;">
+      <button class="btn" id="authSubmitBtn">Login</button>
+    </div>
+    <div class="btnRow" style="margin-top:14px;">
+      <button class="btn secondary small" id="authGuestBtn">Continue as Guest</button>
     </div>
   </div>
 
@@ -2546,6 +2556,8 @@
   const stainCanvas = document.getElementById('stainCanvas');
   const stctx = stainCanvas.getContext('2d');
 
+  let __resizeSettleTimer = null;
+  let __didInitialResize = false;
   function resize(){
     const w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w,h);
@@ -2556,7 +2568,20 @@
       c.width = w*dpr; c.height = h*dpr;
       c.style.width = w+'px'; c.style.height = h+'px';
     });
-    buildWoodTexture();
+    // buildWoodTexture() is a genuinely expensive synchronous canvas render
+    // (per-plank gradients + dozens of curved grain strokes). It used to run
+    // in full on every single 'resize' event — meaning dragging a window
+    // edge, rotating a device, or a mobile browser's address bar
+    // showing/hiding could each fire it dozens of times in under a second,
+    // each one a real main-thread stall. The wood canvas simply keeps
+    // showing its (briefly stretched) previous pixels until things settle —
+    // imperceptible for a slow-drifting background — so actual resize events
+    // are debounced to rebuild once, ~180ms after activity stops. The very
+    // first call (at boot) still builds immediately since there's no prior
+    // texture to fall back on.
+    if(!__didInitialResize){ __didInitialResize = true; buildWoodTexture(); return; }
+    clearTimeout(__resizeSettleTimer);
+    __resizeSettleTimer = setTimeout(buildWoodTexture, 180);
   }
   window.addEventListener('resize', resize);
 
@@ -2579,7 +2604,17 @@
     };
   }
   function buildWoodTexture(){
-    const dpr = Math.min(window.devicePixelRatio||1, 2);
+    // Was a fixed cost regardless of device tier — full DPR-2 canvas plus
+    // 5-9 curved grain strokes per plank on every device, weak or not. High
+    // and Ultra keep the exact original numbers (pixel-identical); lower
+    // tiers — the ones that actually need it — pay less for the same overall
+    // look, matching how shadowMap/particleScale/blur already scale by level.
+    const lvl = Perf.level; // 0 potato .. 4 ultra
+    const dprCap = lvl <= 1 ? 1 : 2;
+    const grainMin = lvl <= 1 ? 2 : (lvl===2 ? 3 : 5);
+    const grainRange = lvl <= 1 ? 2 : (lvl===2 ? 3 : 4);
+    const knotChance = lvl <= 1 ? 0 : 0.35;
+    const dpr = Math.min(window.devicePixelRatio||1, dprCap);
     const w = Math.ceil(window.innerWidth*dpr*1.08); // slight overscan for parallax
     const h = Math.ceil(window.innerHeight*dpr*1.08);
     woodTex = document.createElement('canvas');
@@ -2608,7 +2643,7 @@
       c.fillStyle = g;
       c.fillRect(x,0,pw,h);
       // grain lines: wavy vertical strokes with natural imperfections
-      const grainCount = 5+Math.floor(rnd()*4);
+      const grainCount = grainMin+Math.floor(rnd()*grainRange);
       for(let i=0;i<grainCount;i++){
         const gx = x + rnd()*pw;
         c.beginPath();
@@ -2625,7 +2660,7 @@
         c.stroke();
       }
       // occasional knot
-      if(rnd() < 0.35){
+      if(rnd() < knotChance){
         const ky = rnd()*h, kx = x+pw*0.5+(rnd()-0.5)*pw*0.4, kr = 6+rnd()*10;
         const kg = c.createRadialGradient(kx,ky,0,kx,ky,kr*2.2);
         kg.addColorStop(0,'rgba(8,5,3,0.55)');
